@@ -68,7 +68,7 @@ class AITeleapoManager:
         return f"{timestamp}_{random_suffix}"
     
     def normalize_phone(self, phone_str):
-        """電話番号を正規化"""
+        """電話番号を正規化（+81形式を0始まりに変換）"""
         if pd.isna(phone_str):
             return ""
         phone_str = str(phone_str).replace("+81", "0").replace(" ", "").replace("-", "")
@@ -81,8 +81,11 @@ class AITeleapoManager:
         return str(text).strip().lower()
     
     def create_row_key(self, company, phone):
-        """行指紋を作成"""
-        base = f"{self.normalize_text(company)}|{self.normalize_phone(phone)}"
+        """行指紋を作成（社名ベース）"""
+        # 社名を正規化してキーとして使用
+        normalized_company = self.normalize_text(company)
+        normalized_phone = self.normalize_phone(phone)
+        base = f"{normalized_company}|{normalized_phone}"
         return hashlib.sha256(base.encode('utf-8')).hexdigest()[:16]
     
     def process_filemaker_data(self, df, job_id, output_filename):
@@ -106,7 +109,7 @@ class AITeleapoManager:
         if available_columns:
             upload_df = upload_df[available_columns].copy()
         
-        # 行指紋を作成してrowmapを生成
+        # 行指紋を作成してrowmapを生成（社名ベース）
         rowmap_data = []
         for idx, row in df.iterrows():
             company = row.get('顧客名', '') if '顧客名' in df.columns else row.get('社名', '')
@@ -116,6 +119,7 @@ class AITeleapoManager:
             rowmap_data.append({
                 'row_key': row_key,
                 'company': company,
+                'company_normalized': self.normalize_text(company),
                 'phone': phone,
                 'fm_id': row.get('IDの頭にID', ''),
                 'index_in_fm': idx
@@ -184,7 +188,7 @@ class AITeleapoManager:
             duration = row["通話時間_num"]
             
             # 既に結果が入っている場合はスキップ
-            if result.strip() != "":
+            if result.strip() != "" and result.strip() != "nan":
                 continue
             
             # 留守番電話 → 留守電
@@ -234,7 +238,7 @@ class AITeleapoManager:
         return df
     
     def merge_with_original(self, call_results_df, job_id):
-        """元データとマージ"""
+        """元データとマージ（社名ベース）"""
         job_dir = self.base_dir / job_id
         
         # マニフェストを読み込み
@@ -250,15 +254,17 @@ class AITeleapoManager:
         original_path = job_dir / "fm_export.xlsx"
         original_df = pd.read_excel(original_path)
         
-        # 通話結果に行指紋を追加
-        call_results_df['row_key'] = call_results_df.apply(
-            lambda row: self.create_row_key(row.get('社名', ''), row.get('電話番号', '')), 
-            axis=1
-        )
+        # 通話結果の社名を正規化
+        call_results_df['社名_正規化'] = call_results_df['社名'].apply(self.normalize_text)
         
-        # rowmapとマージしてFMのIDと元データを取得
-        merged_df = pd.merge(call_results_df, rowmap_df[['row_key', 'fm_id', 'company', 'phone']], 
-                           on='row_key', how='left')
+        # 社名ベースでマージ
+        merged_df = pd.merge(
+            call_results_df, 
+            rowmap_df[['company_normalized', 'fm_id', 'company']], 
+            left_on='社名_正規化', 
+            right_on='company_normalized', 
+            how='left'
+        )
         
         # 元データの他の列も結合（IDをキーに）
         if 'fm_id' in merged_df.columns and 'IDの頭にID' in original_df.columns:
@@ -266,6 +272,12 @@ class AITeleapoManager:
             original_subset = original_df[['IDの頭にID', '住所統合', '最終トーク判定', '最終有効無効', '最終決済担当']].copy()
             original_subset = original_subset.rename(columns={'IDの頭にID': 'fm_id'})
             merged_df = pd.merge(merged_df, original_subset, on='fm_id', how='left')
+        
+        # 通話結果に行指紋を追加
+        merged_df['row_key'] = merged_df.apply(
+            lambda row: self.create_row_key(row.get('社名', ''), row.get('電話番号', '')), 
+            axis=1
+        )
         
         # 列の順序を整理
         column_order = ['fm_id', '社名', '電話番号', 'ステータス', '架電結果', '要約', '通話時間', 
@@ -431,7 +443,7 @@ def main():
             
             3. **🚀 ジョブ作成**
                - データを変換・保存
-               - 行指紋を生成
+               - 社名ベースの行指紋を生成
             
             4. **📥 ダウンロード**
                - AIテレアポ用CSVを取得
@@ -471,32 +483,40 @@ def main():
                     # 結果を分析
                     analyzed_df = manager.analyze_call_results(results_df)
                     
-                    # 元データとマージ
-                    merged_df = manager.merge_with_original(analyzed_df, selected_job_id)
-                    
-                    # 統計計算
+                    # 統計を計算
                     stats = manager.calculate_statistics(analyzed_df)
                     
                     # 統計表示
-                    st.subheader("📈 分析結果")
+                    st.subheader("📈 通話統計")
+                    col_stat1, col_stat2, col_stat3 = st.columns(3)
                     
-                    col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
                     with col_stat1:
-                        st.metric("総コール件数", stats['total_calls'])
-                    with col_stat2:
-                        st.metric("有効件数", stats['valid_calls'])
-                    with col_stat3:
-                        st.metric("転送件数(APO)", stats['transfer_calls'])
-                    with col_stat4:
-                        st.metric("総通話時間", stats['total_time'])
+                        st.metric("総通話件数", stats['total_calls'])
+                        st.metric("有効通話件数", stats['valid_calls'])
                     
-                    # 結果内訳
-                    st.subheader("📋 結果内訳")
+                    with col_stat2:
+                        st.metric("総通話時間", stats['total_time'])
+                        st.metric("転送件数", stats['transfer_calls'])
+                    
+                    with col_stat3:
+                        st.metric("無効番号", stats['invalid_numbers'])
+                        st.metric("エラー件数", stats['error_calls'])
+                    
+                    # 結果分布
+                    st.subheader("📊 架電結果分布")
                     result_df = pd.DataFrame(list(stats['result_counts'].items()), 
                                            columns=['結果', '件数'])
                     st.dataframe(result_df, use_container_width=True)
                     
-                    # 出力ファイル名指定
+                    # 元データとマージ（社名ベース）
+                    merged_df = manager.merge_with_original(analyzed_df, selected_job_id)
+                    
+                    # マージ結果の確認
+                    st.subheader("🔗 マージ結果")
+                    matched_count = merged_df['fm_id'].notna().sum()
+                    st.info(f"📊 マッチした件数: {matched_count} / {len(merged_df)} 件")
+                    
+                    # 出力ファイル名の指定
                     st.subheader("💾 結果保存")
                     output_filename = st.text_input(
                         "出力ファイル名を入力してください",
@@ -545,7 +565,7 @@ def main():
                - 統計情報を計算
             
             4. **🔗 データマージ**
-               - 元データと結合
+               - 社名ベースで元データと結合
                - FileMaker用IDを復元
             
             5. **💾 結果保存**
@@ -586,7 +606,7 @@ def main():
         st.info(f"""
         **ジョブ保存場所:** {manager.base_dir.absolute()}
         **作成済みジョブ数:** {len(st.session_state.jobs)}
-        **バージョン:** 1.0.0
+        **バージョン:** 2.0.0 (社名ベースマージ対応)
         """)
 
 if __name__ == "__main__":
