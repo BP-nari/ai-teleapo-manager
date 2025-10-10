@@ -357,49 +357,32 @@ st.markdown("""
         text-align: center;
     }
     
-    /* 直接ダウンロードリンクのスタイル */
-    .download-link {
-        display: inline-block;
-        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    /* ダウンロードボタンのカスタムスタイル */
+    .stDownloadButton > button {
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%) !important;
         color: white !important;
-        padding: 1rem 2rem;
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 1.1rem;
-        text-decoration: none;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 6px rgba(34, 197, 94, 0.2);
-        margin: 0.5rem;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: 600 !important;
+        font-size: 1.1rem !important;
+        padding: 1rem 2rem !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 6px rgba(34, 197, 94, 0.2) !important;
     }
     
-    .download-link:hover {
-        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(34, 197, 94, 0.3);
-        color: white !important;
-        text-decoration: none;
-    }
-    
-    /* ファイルパス表示 */
-    .file-path {
-        background: #f1f5f9;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        padding: 0.75rem;
-        font-family: monospace;
-        font-size: 0.9rem;
-        color: #475569;
-        margin: 0.5rem 0;
-        word-break: break-all;
+    .stDownloadButton > button:hover {
+        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 12px rgba(34, 197, 94, 0.3) !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# localStorage操作のJavaScript関数
-def get_localStorage_script():
+# localStorage操作のJavaScript（シンプル版）
+def localStorage_script():
     return """
     <script>
-    // localStorage操作関数
+    // localStorage操作
     function saveJobsToLocalStorage(jobs) {
         try {
             const jobsData = {
@@ -410,7 +393,7 @@ def get_localStorage_script():
             console.log('Jobs saved to localStorage:', jobs.length, 'jobs');
             return true;
         } catch (error) {
-            console.error('Error saving to localStorage:', error);
+            console.error('Save error:', error);
             return false;
         }
     }
@@ -425,7 +408,7 @@ def get_localStorage_script():
             }
             return [];
         } catch (error) {
-            console.error('Error loading from localStorage:', error);
+            console.error('Load error:', error);
             return [];
         }
     }
@@ -436,27 +419,51 @@ def get_localStorage_script():
             console.log('Jobs cleared from localStorage');
             return true;
         } catch (error) {
-            console.error('Error clearing localStorage:', error);
+            console.error('Clear error:', error);
             return false;
         }
     }
     
-    // Streamlitとの通信用
-    window.teleapoStorage = {
+    // グローバル関数として公開
+    window.teleapoLocalStorage = {
         save: saveJobsToLocalStorage,
         load: loadJobsFromLocalStorage,
         clear: clearJobsFromLocalStorage
     };
     
-    // 初期化完了を通知
-    window.parent.postMessage({type: 'localStorage_ready'}, '*');
+    console.log('localStorage helper initialized');
+    
+    // 既存データを確認して復元
+    const existingJobs = loadJobsFromLocalStorage();
+    if (existingJobs && existingJobs.length > 0) {
+        console.log('Found existing jobs:', existingJobs.length);
+        // Streamlitに既存データを送信
+        window.parent.postMessage({
+            type: 'restore_jobs',
+            jobs: existingJobs
+        }, '*');
+    } else {
+        console.log('No existing jobs found');
+    }
     </script>
     """
 
+# セッション状態の初期化
+def initialize_session_state():
+    """セッション状態を初期化"""
+    if 'jobs' not in st.session_state:
+        st.session_state.jobs = []
+    if 'current_job' not in st.session_state:
+        st.session_state.current_job = None
+    if 'localStorage_initialized' not in st.session_state:
+        st.session_state.localStorage_initialized = False
+
 # localStorage初期化
 def initialize_localStorage():
-    """localStorageを初期化し、既存データを読み込む"""
-    components.html(get_localStorage_script(), height=0)
+    """localStorageを初期化"""
+    if not st.session_state.localStorage_initialized:
+        components.html(localStorage_script(), height=0)
+        st.session_state.localStorage_initialized = True
 
 # ジョブをlocalStorageに保存
 def save_jobs_to_localStorage(jobs):
@@ -471,9 +478,9 @@ def save_jobs_to_localStorage(jobs):
     
     save_script = f"""
     <script>
-    if (window.teleapoStorage) {{
+    if (window.teleapoLocalStorage) {{
         const jobs = {json.dumps(serializable_jobs)};
-        window.teleapoStorage.save(jobs);
+        window.teleapoLocalStorage.save(jobs);
     }}
     </script>
     """
@@ -484,51 +491,22 @@ def clear_localStorage():
     """localStorageをクリア"""
     clear_script = """
     <script>
-    if (window.teleapoStorage) {
-        window.teleapoStorage.clear();
+    if (window.teleapoLocalStorage) {
+        window.teleapoLocalStorage.clear();
     }
     </script>
     """
     components.html(clear_script, height=0)
 
-# セッション状態の初期化
-def initialize_session_state():
-    """セッション状態を初期化"""
-    if 'jobs' not in st.session_state:
-        st.session_state.jobs = []
-    if 'current_job' not in st.session_state:
-        st.session_state.current_job = None
-    if 'localStorage_initialized' not in st.session_state:
-        st.session_state.localStorage_initialized = False
-
-# ダウンロード用のHTMLリンクを生成
-def create_download_link(file_path, display_name, icon="📥"):
-    """ファイルダウンロード用のHTMLリンクを生成"""
+# ファイルを読み込んでダウンロード用データを準備
+def prepare_download_data(file_path):
+    """ファイルを読み込んでダウンロード用のバイトデータを準備"""
     try:
-        # ファイルが存在するかチェック
-        if not os.path.exists(file_path):
-            return f"<p style='color: red;'>❌ ファイルが見つかりません: {file_path}</p>"
-        
-        # ファイルサイズを取得
-        file_size = os.path.getsize(file_path)
-        size_mb = file_size / (1024 * 1024)
-        
-        # 相対パスに変換（Streamlitのstatic file serving用）
-        relative_path = os.path.relpath(file_path, os.getcwd())
-        
-        return f"""
-        <div class="download-section">
-            <h4>{icon} {display_name}</h4>
-            <p><strong>ファイルサイズ:</strong> {size_mb:.2f} MB</p>
-            <div class="file-path">📁 {relative_path}</div>
-            <p>⬇️ 右クリックして「名前を付けてリンク先を保存」でダウンロードしてください</p>
-            <a href="/{relative_path}" class="download-link" target="_blank" download="{os.path.basename(file_path)}">
-                {icon} {display_name}をダウンロード
-            </a>
-        </div>
-        """
+        with open(file_path, 'rb') as f:
+            return f.read()
     except Exception as e:
-        return f"<p style='color: red;'>❌ ダウンロードリンク生成エラー: {str(e)}</p>"
+        st.error(f"ファイル読み込みエラー: {str(e)}")
+        return None
 
 class AITeleapoManager:
     def __init__(self):
@@ -763,18 +741,6 @@ class AITeleapoManager:
         
         return merged_df
     
-    def save_analysis_result(self, merged_df, job_id, output_filename):
-        """分析結果をファイルに保存"""
-        job_dir = self.base_dir / job_id
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-        final_filename = f"{output_filename}_{timestamp}.xlsx"
-        result_path = job_dir / final_filename
-        
-        # Excelファイルとして保存
-        merged_df.to_excel(result_path, index=False, engine='openpyxl')
-        
-        return result_path, final_filename
-    
     def calculate_statistics(self, df):
         """統計を計算"""
         def parse_duration(val):
@@ -932,13 +898,32 @@ def main():
     # サイドバー
     st.sidebar.title("🎛️ 操作メニュー")
     
+    # localStorage復元ボタン（デバッグ用）
+    if st.sidebar.button("🔄 localStorage復元"):
+        restore_script = """
+        <script>
+        if (window.teleapoLocalStorage) {
+            const jobs = window.teleapoLocalStorage.load();
+            if (jobs && jobs.length > 0) {
+                console.log('Manual restore:', jobs.length, 'jobs');
+                window.parent.postMessage({
+                    type: 'restore_jobs',
+                    jobs: jobs
+                }, '*');
+            }
+        }
+        </script>
+        """
+        components.html(restore_script, height=0)
+        st.sidebar.success("復元を試行しました")
+    
     # システム情報を表示
     st.sidebar.markdown(f"""
     <div class="sidebar-section">
         <h4><span class="small-icon">📊</span> システム情報</h4>
         <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
         <p><strong>保存場所:</strong> {manager.base_dir.name}/</p>
-        <p><strong>バージョン:</strong> 3.0.0 (直接ダウンロード対応版)</p>
+        <p><strong>バージョン:</strong> 5.0.0 (localStorage修正版)</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -1021,14 +1006,26 @@ def main():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # 直接ダウンロードリンクを生成
-                            final_filename = f"{output_name}_{job_id}.csv"
-                            download_html = create_download_link(
-                                str(result['upload_path']), 
-                                final_filename,
-                                "📥"
-                            )
-                            st.markdown(download_html, unsafe_allow_html=True)
+                            # ファイルを読み込んでダウンロードボタンを作成
+                            file_data = prepare_download_data(result['upload_path'])
+                            if file_data:
+                                final_filename = f"{output_name}_{job_id}.csv"
+                                
+                                st.markdown("""
+                                <div class="download-section">
+                                    <h4>📥 ファイルダウンロード</h4>
+                                    <p>AIテレアポシステムにアップロードするCSVファイルをダウンロードしてください。</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                st.download_button(
+                                    label="📥 AIテレアポ用CSVをダウンロード",
+                                    data=file_data,
+                                    file_name=final_filename,
+                                    mime="text/csv",
+                                    help="日本語対応エンコーディングで保存されています",
+                                    key=f"download_{job_id}"
+                                )
                 
                 except Exception as e:
                     st.error(f"❌ ファイル処理エラー: {str(e)}")
@@ -1165,6 +1162,13 @@ def main():
                             </div>
                             """, unsafe_allow_html=True)
                             
+                            # セッション状態に分析結果を保存
+                            st.session_state[f'analysis_result_{selected_job_id}'] = {
+                                'merged_df': merged_df,
+                                'stats': stats,
+                                'analyzed_df': analyzed_df
+                            }
+                            
                             # 出力ファイル名の指定
                             st.subheader("💾 結果保存")
                             output_filename = st.text_input(
@@ -1175,30 +1179,59 @@ def main():
                             
                             if st.button("💾 結果を保存", type="primary"):
                                 try:
-                                    # ファイルに保存
-                                    result_path, final_filename = manager.save_analysis_result(
-                                        merged_df, selected_job_id, output_filename
-                                    )
+                                    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+                                    final_filename = f"{output_filename}_{timestamp}.xlsx"
                                     
-                                    st.markdown(f"""
-                                    <div class="success-box">
-                                        <h4>✅ 分析完了！</h4>
-                                        <p><strong>ファイル:</strong> {final_filename}</p>
-                                        <p><strong>データ件数:</strong> {len(merged_df):,} 件</p>
-                                        <p>FileMakerに取り込み可能な形式で保存されました。</p>
-                                    </div>
-                                    """, unsafe_allow_html=True)
+                                    # メモリ上でExcelファイルを作成
+                                    buffer = BytesIO()
+                                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                                        merged_df.to_excel(writer, index=False, sheet_name='分析結果')
+                                    buffer.seek(0)
+                                    excel_data = buffer.getvalue()
                                     
-                                    # 直接ダウンロードリンクを生成
-                                    download_html = create_download_link(
-                                        str(result_path), 
-                                        final_filename,
-                                        "📊"
-                                    )
-                                    st.markdown(download_html, unsafe_allow_html=True)
+                                    # セッション状態にダウンロードデータを保存
+                                    st.session_state[f'download_data_{selected_job_id}'] = {
+                                        'data': excel_data,
+                                        'filename': final_filename,
+                                        'timestamp': timestamp,
+                                        'row_count': len(merged_df)
+                                    }
+                                    
+                                    st.success("✅ 結果が保存されました！下のダウンロードボタンからファイルを取得してください。")
                                     
                                 except Exception as e:
-                                    st.error(f"❌ ファイル保存エラー: {str(e)}")
+                                    st.error(f"❌ ファイル生成エラー: {str(e)}")
+                            
+                            # ダウンロードボタンを常時表示（データがある場合）
+                            download_key = f'download_data_{selected_job_id}'
+                            if download_key in st.session_state:
+                                download_info = st.session_state[download_key]
+                                
+                                st.markdown(f"""
+                                <div class="success-box">
+                                    <h4>✅ 分析完了！</h4>
+                                    <p><strong>ファイル:</strong> {download_info['filename']}</p>
+                                    <p><strong>データ件数:</strong> {download_info['row_count']:,} 件</p>
+                                    <p>FileMakerに取り込み可能な形式で保存されました。</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                # ダウンロードセクション
+                                st.markdown("""
+                                <div class="download-section">
+                                    <h4>📥 分析結果ダウンロード</h4>
+                                    <p>FileMakerに取り込み可能な形式で保存されました。</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                # ダウンロードボタン
+                                st.download_button(
+                                    label="📊 分析結果をダウンロード",
+                                    data=download_info['data'],
+                                    file_name=download_info['filename'],
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    key=f"download_result_{selected_job_id}_{download_info['timestamp']}"
+                                )
                             
                             # データプレビュー
                             with st.expander("📋 分析済みデータプレビュー"):
@@ -1271,22 +1304,8 @@ def main():
             <p><strong>ジョブ保存場所:</strong> {manager.base_dir.absolute()}</p>
             <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
             <p><strong>localStorage対応:</strong> ✅ 有効</p>
-            <p><strong>バージョン:</strong> 3.0.0 (直接ダウンロード対応版)</p>
-            <p><strong>新機能:</strong> 直接ファイルリンク、確実なダウンロード</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.subheader("🔧 ダウンロード方法")
-        st.markdown("""
-        <div class="sidebar-section">
-            <h4><span class="small-icon">💾</span> ファイルダウンロードについて</h4>
-            <ul>
-                <li><strong>方法1:</strong> ダウンロードボタンをクリック</li>
-                <li><strong>方法2:</strong> リンクを右クリック → 「名前を付けてリンク先を保存」</li>
-                <li><strong>保存場所:</strong> ブラウザのダウンロードフォルダ</li>
-                <li><strong>ファイル形式:</strong> CSV（新規作成）、Excel（結果分析）</li>
-            </ul>
-            <p><small>※ teleapo_jobs/ 内のファイルは従来通りサーバー側に保持されます</small></p>
+            <p><strong>バージョン:</strong> 5.0.0 (localStorage修正版)</p>
+            <p><strong>新機能:</strong> シンプルなlocalStorage実装、確実な復元機能</p>
         </div>
         """, unsafe_allow_html=True)
 
