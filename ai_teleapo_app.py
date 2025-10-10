@@ -7,9 +7,8 @@ import json
 import os
 from pathlib import Path
 import time
-import streamlit.components.v1 as components
 from io import BytesIO
-import base64
+import pickle
 
 # ページ設定
 st.set_page_config(
@@ -378,135 +377,104 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# localStorage操作のJavaScript（シンプル版）
-def localStorage_script():
-    return """
-    <script>
-    // localStorage操作
-    function saveJobsToLocalStorage(jobs) {
-        try {
-            const jobsData = {
-                jobs: jobs,
-                lastUpdated: new Date().toISOString()
-            };
-            localStorage.setItem('teleapo_jobs', JSON.stringify(jobsData));
-            console.log('Jobs saved to localStorage:', jobs.length, 'jobs');
-            return true;
-        } catch (error) {
-            console.error('Save error:', error);
-            return false;
-        }
-    }
+# ファイルベースのジョブ履歴管理
+class JobHistoryManager:
+    def __init__(self):
+        self.history_file = Path("job_history.json")
+        self.download_cache_dir = Path("download_cache")
+        self.download_cache_dir.mkdir(exist_ok=True)
     
-    function loadJobsFromLocalStorage() {
-        try {
-            const data = localStorage.getItem('teleapo_jobs');
-            if (data) {
-                const jobsData = JSON.parse(data);
-                console.log('Jobs loaded from localStorage:', jobsData.jobs.length, 'jobs');
-                return jobsData.jobs;
+    def save_jobs(self, jobs):
+        """ジョブ履歴をファイルに保存"""
+        try:
+            # datetime オブジェクトを文字列に変換
+            serializable_jobs = []
+            for job in jobs:
+                job_copy = job.copy()
+                if isinstance(job_copy.get('created_at'), datetime):
+                    job_copy['created_at'] = job_copy['created_at'].isoformat()
+                serializable_jobs.append(job_copy)
+            
+            with open(self.history_file, 'w', encoding='utf-8') as f:
+                json.dump(serializable_jobs, f, ensure_ascii=False, indent=2)
+            return True
+        except Exception as e:
+            st.error(f"ジョブ履歴保存エラー: {str(e)}")
+            return False
+    
+    def load_jobs(self):
+        """ジョブ履歴をファイルから読み込み"""
+        try:
+            if self.history_file.exists():
+                with open(self.history_file, 'r', encoding='utf-8') as f:
+                    jobs = json.load(f)
+                
+                # 文字列をdatetimeオブジェクトに変換
+                for job in jobs:
+                    if isinstance(job.get('created_at'), str):
+                        try:
+                            job['created_at'] = datetime.fromisoformat(job['created_at'])
+                        except:
+                            job['created_at'] = datetime.now()
+                
+                return jobs
+            return []
+        except Exception as e:
+            st.error(f"ジョブ履歴読み込みエラー: {str(e)}")
+            return []
+    
+    def clear_jobs(self):
+        """ジョブ履歴をクリア"""
+        try:
+            if self.history_file.exists():
+                self.history_file.unlink()
+            return True
+        except Exception as e:
+            st.error(f"ジョブ履歴クリアエラー: {str(e)}")
+            return False
+    
+    def save_download_file(self, file_id, data, filename):
+        """ダウンロード用ファイルをキャッシュに保存"""
+        try:
+            cache_file = self.download_cache_dir / f"{file_id}.pkl"
+            cache_data = {
+                'data': data,
+                'filename': filename,
+                'created_at': datetime.now().isoformat()
             }
-            return [];
-        } catch (error) {
-            console.error('Load error:', error);
-            return [];
-        }
-    }
+            with open(cache_file, 'wb') as f:
+                pickle.dump(cache_data, f)
+            return True
+        except Exception as e:
+            st.error(f"ダウンロードファイル保存エラー: {str(e)}")
+            return False
     
-    function clearJobsFromLocalStorage() {
-        try {
-            localStorage.removeItem('teleapo_jobs');
-            console.log('Jobs cleared from localStorage');
-            return true;
-        } catch (error) {
-            console.error('Clear error:', error);
-            return false;
-        }
-    }
-    
-    // グローバル関数として公開
-    window.teleapoLocalStorage = {
-        save: saveJobsToLocalStorage,
-        load: loadJobsFromLocalStorage,
-        clear: clearJobsFromLocalStorage
-    };
-    
-    console.log('localStorage helper initialized');
-    
-    // 既存データを確認して復元
-    const existingJobs = loadJobsFromLocalStorage();
-    if (existingJobs && existingJobs.length > 0) {
-        console.log('Found existing jobs:', existingJobs.length);
-        // Streamlitに既存データを送信
-        window.parent.postMessage({
-            type: 'restore_jobs',
-            jobs: existingJobs
-        }, '*');
-    } else {
-        console.log('No existing jobs found');
-    }
-    </script>
-    """
+    def get_download_file(self, file_id):
+        """ダウンロード用ファイルをキャッシュから取得"""
+        try:
+            cache_file = self.download_cache_dir / f"{file_id}.pkl"
+            if cache_file.exists():
+                with open(cache_file, 'rb') as f:
+                    cache_data = pickle.load(f)
+                return cache_data
+            return None
+        except Exception as e:
+            st.error(f"ダウンロードファイル取得エラー: {str(e)}")
+            return None
 
 # セッション状態の初期化
 def initialize_session_state():
     """セッション状態を初期化"""
     if 'jobs' not in st.session_state:
-        st.session_state.jobs = []
+        # ファイルからジョブ履歴を読み込み
+        history_manager = JobHistoryManager()
+        st.session_state.jobs = history_manager.load_jobs()
+    
     if 'current_job' not in st.session_state:
         st.session_state.current_job = None
-    if 'localStorage_initialized' not in st.session_state:
-        st.session_state.localStorage_initialized = False
-
-# localStorage初期化
-def initialize_localStorage():
-    """localStorageを初期化"""
-    if not st.session_state.localStorage_initialized:
-        components.html(localStorage_script(), height=0)
-        st.session_state.localStorage_initialized = True
-
-# ジョブをlocalStorageに保存
-def save_jobs_to_localStorage(jobs):
-    """ジョブリストをlocalStorageに保存"""
-    # datetime オブジェクトを文字列に変換
-    serializable_jobs = []
-    for job in jobs:
-        job_copy = job.copy()
-        if isinstance(job_copy.get('created_at'), datetime):
-            job_copy['created_at'] = job_copy['created_at'].isoformat()
-        serializable_jobs.append(job_copy)
     
-    save_script = f"""
-    <script>
-    if (window.teleapoLocalStorage) {{
-        const jobs = {json.dumps(serializable_jobs)};
-        window.teleapoLocalStorage.save(jobs);
-    }}
-    </script>
-    """
-    components.html(save_script, height=0)
-
-# localStorageをクリア
-def clear_localStorage():
-    """localStorageをクリア"""
-    clear_script = """
-    <script>
-    if (window.teleapoLocalStorage) {
-        window.teleapoLocalStorage.clear();
-    }
-    </script>
-    """
-    components.html(clear_script, height=0)
-
-# ファイルを読み込んでダウンロード用データを準備
-def prepare_download_data(file_path):
-    """ファイルを読み込んでダウンロード用のバイトデータを準備"""
-    try:
-        with open(file_path, 'rb') as f:
-            return f.read()
-    except Exception as e:
-        st.error(f"ファイル読み込みエラー: {str(e)}")
-        return None
+    if 'history_manager' not in st.session_state:
+        st.session_state.history_manager = JobHistoryManager()
 
 class AITeleapoManager:
     def __init__(self):
@@ -888,34 +856,13 @@ def main():
     # セッション状態の初期化
     initialize_session_state()
     
-    # localStorage初期化
-    initialize_localStorage()
-    
     st.markdown('<h1 class="main-header">📞 AIテレアポ管理システム</h1>', unsafe_allow_html=True)
     
     manager = AITeleapoManager()
+    history_manager = st.session_state.history_manager
     
     # サイドバー
     st.sidebar.title("🎛️ 操作メニュー")
-    
-    # localStorage復元ボタン（デバッグ用）
-    if st.sidebar.button("🔄 localStorage復元"):
-        restore_script = """
-        <script>
-        if (window.teleapoLocalStorage) {
-            const jobs = window.teleapoLocalStorage.load();
-            if (jobs && jobs.length > 0) {
-                console.log('Manual restore:', jobs.length, 'jobs');
-                window.parent.postMessage({
-                    type: 'restore_jobs',
-                    jobs: jobs
-                }, '*');
-            }
-        }
-        </script>
-        """
-        components.html(restore_script, height=0)
-        st.sidebar.success("復元を試行しました")
     
     # システム情報を表示
     st.sidebar.markdown(f"""
@@ -923,7 +870,8 @@ def main():
         <h4><span class="small-icon">📊</span> システム情報</h4>
         <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
         <p><strong>保存場所:</strong> {manager.base_dir.name}/</p>
-        <p><strong>バージョン:</strong> 5.0.0 (localStorage修正版)</p>
+        <p><strong>履歴ファイル:</strong> job_history.json</p>
+        <p><strong>バージョン:</strong> 6.0.0 (完全修正版)</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -993,8 +941,8 @@ def main():
                             }
                             st.session_state.jobs.append(job_info)
                             
-                            # localStorageに保存
-                            save_jobs_to_localStorage(st.session_state.jobs)
+                            # ファイルに保存
+                            history_manager.save_jobs(st.session_state.jobs)
                             
                             st.markdown(f"""
                             <div class="success-box">
@@ -1002,13 +950,15 @@ def main():
                                 <p><strong>ジョブID:</strong> {job_id}</p>
                                 <p><strong>処理件数:</strong> {result['total_rows']:,} 件</p>
                                 <p><strong>ロボット台数:</strong> {robot_count} 台</p>
-                                <p><span class="small-icon">💾</span> ジョブ履歴がブラウザに保存されました</p>
+                                <p><span class="small-icon">💾</span> ジョブ履歴がファイルに保存されました</p>
                             </div>
                             """, unsafe_allow_html=True)
                             
                             # ファイルを読み込んでダウンロードボタンを作成
-                            file_data = prepare_download_data(result['upload_path'])
-                            if file_data:
+                            try:
+                                with open(result['upload_path'], 'rb') as f:
+                                    file_data = f.read()
+                                
                                 final_filename = f"{output_name}_{job_id}.csv"
                                 
                                 st.markdown("""
@@ -1026,6 +976,8 @@ def main():
                                     help="日本語対応エンコーディングで保存されています",
                                     key=f"download_{job_id}"
                                 )
+                            except Exception as e:
+                                st.error(f"❌ ファイル読み込みエラー: {str(e)}")
                 
                 except Exception as e:
                     st.error(f"❌ ファイル処理エラー: {str(e)}")
@@ -1162,13 +1114,6 @@ def main():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # セッション状態に分析結果を保存
-                            st.session_state[f'analysis_result_{selected_job_id}'] = {
-                                'merged_df': merged_df,
-                                'stats': stats,
-                                'analyzed_df': analyzed_df
-                            }
-                            
                             # 出力ファイル名の指定
                             st.subheader("💾 結果保存")
                             output_filename = st.text_input(
@@ -1189,49 +1134,50 @@ def main():
                                     buffer.seek(0)
                                     excel_data = buffer.getvalue()
                                     
-                                    # セッション状態にダウンロードデータを保存
-                                    st.session_state[f'download_data_{selected_job_id}'] = {
-                                        'data': excel_data,
-                                        'filename': final_filename,
-                                        'timestamp': timestamp,
-                                        'row_count': len(merged_df)
-                                    }
+                                    # ダウンロードキャッシュに保存
+                                    file_id = f"result_{selected_job_id}_{timestamp}"
+                                    history_manager.save_download_file(file_id, excel_data, final_filename)
+                                    
+                                    # セッション状態にファイルIDを保存
+                                    st.session_state[f'download_file_id_{selected_job_id}'] = file_id
                                     
                                     st.success("✅ 結果が保存されました！下のダウンロードボタンからファイルを取得してください。")
                                     
                                 except Exception as e:
                                     st.error(f"❌ ファイル生成エラー: {str(e)}")
                             
-                            # ダウンロードボタンを常時表示（データがある場合）
-                            download_key = f'download_data_{selected_job_id}'
-                            if download_key in st.session_state:
-                                download_info = st.session_state[download_key]
+                            # ダウンロードボタンを常時表示（ファイルIDがある場合）
+                            download_file_id_key = f'download_file_id_{selected_job_id}'
+                            if download_file_id_key in st.session_state:
+                                file_id = st.session_state[download_file_id_key]
+                                cached_file = history_manager.get_download_file(file_id)
                                 
-                                st.markdown(f"""
-                                <div class="success-box">
-                                    <h4>✅ 分析完了！</h4>
-                                    <p><strong>ファイル:</strong> {download_info['filename']}</p>
-                                    <p><strong>データ件数:</strong> {download_info['row_count']:,} 件</p>
-                                    <p>FileMakerに取り込み可能な形式で保存されました。</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                
-                                # ダウンロードセクション
-                                st.markdown("""
-                                <div class="download-section">
-                                    <h4>📥 分析結果ダウンロード</h4>
-                                    <p>FileMakerに取り込み可能な形式で保存されました。</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                
-                                # ダウンロードボタン
-                                st.download_button(
-                                    label="📊 分析結果をダウンロード",
-                                    data=download_info['data'],
-                                    file_name=download_info['filename'],
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    key=f"download_result_{selected_job_id}_{download_info['timestamp']}"
-                                )
+                                if cached_file:
+                                    st.markdown(f"""
+                                    <div class="success-box">
+                                        <h4>✅ 分析完了！</h4>
+                                        <p><strong>ファイル:</strong> {cached_file['filename']}</p>
+                                        <p><strong>データ件数:</strong> {len(merged_df):,} 件</p>
+                                        <p>FileMakerに取り込み可能な形式で保存されました。</p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # ダウンロードセクション
+                                    st.markdown("""
+                                    <div class="download-section">
+                                        <h4>📥 分析結果ダウンロード</h4>
+                                        <p>FileMakerに取り込み可能な形式で保存されました。</p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # ダウンロードボタン
+                                    st.download_button(
+                                        label="📊 分析結果をダウンロード",
+                                        data=cached_file['data'],
+                                        file_name=cached_file['filename'],
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        key=f"download_result_{file_id}"
+                                    )
                             
                             # データプレビュー
                             with st.expander("📋 分析済みデータプレビュー"):
@@ -1261,8 +1207,8 @@ def main():
             st.subheader("📋 作成済みジョブ一覧")
             st.markdown(f"""
             <div class="info-box">
-                <h4><span class="small-icon">💾</span> localStorage対応</h4>
-                <p>ジョブ履歴はブラウザのlocalStorageに保存されており、ブラウザを閉じても次回訪問時に自動で復元されます。</p>
+                <h4><span class="small-icon">💾</span> ファイルベース履歴管理</h4>
+                <p>ジョブ履歴は job_history.json ファイルに保存されており、アプリケーション再起動時に自動で復元されます。</p>
                 <p><strong>保存済みジョブ数:</strong> {len(st.session_state.jobs)} 件</p>
             </div>
             """, unsafe_allow_html=True)
@@ -1275,7 +1221,7 @@ def main():
             <div class="info-box">
                 <h4><span class="small-icon">📝</span> ジョブ履歴が空です</h4>
                 <p>まだジョブが作成されていません。「📤 新規ジョブ作成」から最初のジョブを作成してください。</p>
-                <p>作成されたジョブは自動的にブラウザのlocalStorageに保存され、次回訪問時に復元されます。</p>
+                <p>作成されたジョブは自動的にファイルに保存され、次回起動時に復元されます。</p>
             </div>
             """, unsafe_allow_html=True)
     
@@ -1287,25 +1233,30 @@ def main():
         col1, col2 = st.columns(2)
         
         with col1:
-            if st.button("🗑️ セッション履歴をクリア", type="secondary"):
+            if st.button("🗑️ ジョブ履歴をクリア", type="secondary"):
                 st.session_state.jobs = []
-                st.success("✅ セッション内のジョブ履歴をクリアしました。")
+                history_manager.clear_jobs()
+                st.success("✅ ジョブ履歴をクリアしました。")
         
         with col2:
-            if st.button("🗑️ localStorage履歴をクリア", type="secondary"):
-                st.session_state.jobs = []
-                clear_localStorage()
-                st.success("✅ localStorage内のジョブ履歴をクリアしました。")
+            if st.button("🔄 履歴を再読み込み", type="secondary"):
+                st.session_state.jobs = history_manager.load_jobs()
+                st.success("✅ ジョブ履歴を再読み込みしました。")
         
         st.subheader("ℹ️ システム情報")
+        history_file_exists = history_manager.history_file.exists()
+        cache_files = len(list(history_manager.download_cache_dir.glob("*.pkl")))
+        
         st.markdown(f"""
         <div class="info-box">
             <h4><span class="small-icon">📊</span> システム詳細</h4>
             <p><strong>ジョブ保存場所:</strong> {manager.base_dir.absolute()}</p>
+            <p><strong>履歴ファイル:</strong> {history_manager.history_file.absolute()}</p>
+            <p><strong>履歴ファイル存在:</strong> {'✅ あり' if history_file_exists else '❌ なし'}</p>
+            <p><strong>キャッシュファイル数:</strong> {cache_files} 個</p>
             <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
-            <p><strong>localStorage対応:</strong> ✅ 有効</p>
-            <p><strong>バージョン:</strong> 5.0.0 (localStorage修正版)</p>
-            <p><strong>新機能:</strong> シンプルなlocalStorage実装、確実な復元機能</p>
+            <p><strong>バージョン:</strong> 6.0.0 (完全修正版)</p>
+            <p><strong>新機能:</strong> ファイルベース履歴管理、確実なダウンロード機能</p>
         </div>
         """, unsafe_allow_html=True)
 
