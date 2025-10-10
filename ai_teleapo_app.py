@@ -920,7 +920,7 @@ def main():
         <h4><span class="small-icon">📊</span> システム情報</h4>
         <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
         <p><strong>保存場所:</strong> {manager.base_dir.name}/</p>
-        <p><strong>バージョン:</strong> 2.3.0 (クリーンUI)</p>
+      
     </div>
     """, unsafe_allow_html=True)
     
