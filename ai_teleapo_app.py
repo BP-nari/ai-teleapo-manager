@@ -17,193 +17,208 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 青ベースダークテーマのカスタムCSS
+# 白背景で見やすい青ベースのカスタムCSS
 st.markdown("""
 <style>
-    /* 全体の背景色を青ベースのダークテーマに */
+    /* 全体の背景を白に */
     .stApp {
-        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
-        color: #e5e7eb;
+        background-color: #ffffff;
+        color: #333333;
     }
     
     /* メインコンテンツエリア */
     .main .block-container {
-        background: rgba(30, 58, 138, 0.1);
-        backdrop-filter: blur(10px);
-        border-radius: 15px;
+        background-color: #ffffff;
         padding: 2rem;
-        margin-top: 1rem;
-        border: 1px solid rgba(59, 130, 246, 0.3);
+        max-width: 1200px;
     }
     
     /* サイドバー */
     .css-1d391kg {
-        background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
-    }
-    
-    .css-1d391kg .css-1v0mbdj {
-        background: transparent;
+        background-color: #f8fafc;
+        border-right: 1px solid #e2e8f0;
     }
     
     /* ヘッダー */
     .main-header {
         font-size: 2.5rem;
-        color: #60a5fa;
+        color: #1e40af;
         text-align: center;
         margin-bottom: 2rem;
-        text-shadow: 0 0 20px rgba(96, 165, 250, 0.5);
         font-weight: 700;
+        padding: 1rem 0;
+        border-bottom: 3px solid #3b82f6;
     }
     
-    /* ジョブカード - ダークテーマ */
+    /* ジョブカード - 清潔感のあるデザイン */
     .job-card {
-        background: linear-gradient(135deg, rgba(30, 58, 138, 0.8) 0%, rgba(30, 64, 175, 0.8) 100%);
+        background: #ffffff;
         padding: 1.5rem;
-        border-radius: 15px;
+        border-radius: 12px;
         margin: 1rem 0;
-        border: 1px solid rgba(59, 130, 246, 0.4);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        backdrop-filter: blur(10px);
+        border: 2px solid #e2e8f0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
         transition: all 0.3s ease;
     }
     
     .job-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 12px 40px rgba(59, 130, 246, 0.3);
-        border-color: rgba(96, 165, 250, 0.6);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+        border-color: #3b82f6;
     }
     
     .job-card-header {
-        font-size: 1.2rem;
+        font-size: 1.3rem;
         font-weight: bold;
-        color: #93c5fd;
-        margin-bottom: 0.8rem;
+        color: #1e40af;
+        margin-bottom: 1rem;
         border-bottom: 2px solid #3b82f6;
         padding-bottom: 0.5rem;
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        justify-content: space-between;
     }
     
     .job-info-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
         gap: 1rem;
         margin-top: 1rem;
     }
     
     .job-info-item {
-        background: rgba(30, 64, 175, 0.6);
+        background: #f8fafc;
         padding: 1rem;
-        border-radius: 10px;
-        border-left: 4px solid #60a5fa;
-        backdrop-filter: blur(5px);
+        border-radius: 8px;
+        border-left: 4px solid #3b82f6;
+        border: 1px solid #e2e8f0;
     }
     
     .job-info-label {
-        font-size: 0.8rem;
-        color: #93c5fd;
-        font-weight: 500;
+        font-size: 0.85rem;
+        color: #64748b;
+        font-weight: 600;
         margin-bottom: 0.3rem;
         display: flex;
         align-items: center;
-        gap: 0.3rem;
+        gap: 0.4rem;
     }
     
     .job-info-value {
         font-size: 1rem;
-        color: #e5e7eb;
+        color: #1e293b;
         font-weight: 600;
     }
     
-    /* 成功ボックス - ダークテーマ */
+    /* 成功ボックス */
     .success-box {
-        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.2) 100%);
-        border: 1px solid rgba(16, 185, 129, 0.4);
-        color: #6ee7b7;
+        background: #f0fdf4;
+        border: 2px solid #22c55e;
+        color: #15803d;
         padding: 1.5rem;
         border-radius: 12px;
         margin: 1rem 0;
-        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.1);
-        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 4px rgba(34, 197, 94, 0.1);
     }
     
-    /* 警告ボックス - ダークテーマ */
+    .success-box h4 {
+        color: #15803d;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* 警告ボックス */
     .warning-box {
-        background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.2) 100%);
-        border: 1px solid rgba(245, 158, 11, 0.4);
-        color: #fbbf24;
+        background: #fffbeb;
+        border: 2px solid #f59e0b;
+        color: #d97706;
         padding: 1.5rem;
         border-radius: 12px;
         margin: 1rem 0;
-        box-shadow: 0 4px 20px rgba(245, 158, 11, 0.1);
-        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
     }
     
-    /* 情報ボックス - ダークテーマ */
+    .warning-box h4 {
+        color: #d97706;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* 情報ボックス */
     .info-box {
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%);
-        border: 1px solid rgba(59, 130, 246, 0.4);
-        color: #93c5fd;
+        background: #eff6ff;
+        border: 2px solid #3b82f6;
+        color: #1d4ed8;
         padding: 1.5rem;
         border-radius: 12px;
         margin: 1rem 0;
-        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1);
-        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
     }
     
-    /* メトリクスカード - ダークテーマ */
+    .info-box h4 {
+        color: #1d4ed8;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* メトリクスカード */
     .metric-card {
-        background: linear-gradient(135deg, rgba(30, 64, 175, 0.8) 0%, rgba(37, 99, 235, 0.8) 100%);
+        background: #ffffff;
         padding: 1.5rem;
         border-radius: 12px;
         text-align: center;
-        box-shadow: 0 6px 25px rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(96, 165, 250, 0.3);
-        backdrop-filter: blur(10px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        border: 2px solid #e2e8f0;
         transition: all 0.3s ease;
     }
     
     .metric-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 8px 30px rgba(96, 165, 250, 0.2);
+        box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+        border-color: #3b82f6;
     }
     
     .metric-value {
-        font-size: 2.2rem;
+        font-size: 2.5rem;
         font-weight: bold;
-        color: #60a5fa;
-        text-shadow: 0 0 10px rgba(96, 165, 250, 0.3);
+        color: #1e40af;
+        margin-bottom: 0.5rem;
     }
     
     .metric-label {
         font-size: 0.9rem;
-        color: #93c5fd;
-        margin-top: 0.5rem;
-        font-weight: 500;
+        color: #64748b;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.3rem;
     }
     
-    /* サイドバーセクション - ダークテーマ */
+    /* サイドバーセクション */
     .sidebar-section {
-        background: rgba(30, 64, 175, 0.6);
+        background: #ffffff;
         padding: 1.2rem;
         border-radius: 10px;
         margin: 1rem 0;
-        border-left: 4px solid #60a5fa;
-        backdrop-filter: blur(5px);
-        border: 1px solid rgba(96, 165, 250, 0.2);
+        border: 2px solid #e2e8f0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
     
     .sidebar-section h4 {
-        color: #93c5fd;
+        color: #1e40af;
         margin-bottom: 0.8rem;
         font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
     }
     
     .sidebar-section p, .sidebar-section li {
-        color: #d1d5db;
+        color: #475569;
         font-size: 0.9rem;
-        line-height: 1.5;
+        line-height: 1.6;
+    }
+    
+    .sidebar-section ol li {
+        margin-bottom: 0.5rem;
     }
     
     /* ステータスバッジ */
@@ -211,7 +226,7 @@ st.markdown("""
         display: inline-flex;
         align-items: center;
         gap: 0.3rem;
-        padding: 0.3rem 0.8rem;
+        padding: 0.4rem 0.8rem;
         border-radius: 20px;
         font-size: 0.75rem;
         font-weight: 600;
@@ -220,137 +235,185 @@ st.markdown("""
     }
     
     .status-created {
-        background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.3));
-        color: #6ee7b7;
-        border: 1px solid rgba(16, 185, 129, 0.5);
+        background-color: #dcfce7;
+        color: #15803d;
+        border: 1px solid #22c55e;
     }
     
     .status-processing {
-        background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(217, 119, 6, 0.3));
-        color: #fbbf24;
-        border: 1px solid rgba(245, 158, 11, 0.5);
+        background-color: #fef3c7;
+        color: #d97706;
+        border: 1px solid #f59e0b;
     }
     
     .status-completed {
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(37, 99, 235, 0.3));
-        color: #93c5fd;
-        border: 1px solid rgba(59, 130, 246, 0.5);
+        background-color: #dbeafe;
+        color: #1d4ed8;
+        border: 1px solid #3b82f6;
     }
     
     /* 小さなアイコン */
     .small-icon {
         font-size: 0.8rem;
-        opacity: 0.8;
+        margin-right: 0.2rem;
+    }
+    
+    /* セクションヘッダー */
+    .section-header {
+        color: #1e40af;
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin: 2rem 0 1rem 0;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
     }
     
     /* Streamlitコンポーネントのスタイル調整 */
     .stSelectbox > div > div {
-        background: rgba(30, 64, 175, 0.6);
-        border: 1px solid rgba(96, 165, 250, 0.3);
-        color: #e5e7eb;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+    }
+    
+    .stSelectbox > div > div:focus-within {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
     
     .stTextInput > div > div > input {
-        background: rgba(30, 64, 175, 0.6);
-        border: 1px solid rgba(96, 165, 250, 0.3);
-        color: #e5e7eb;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.75rem;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
     
     .stButton > button {
-        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-        border: 1px solid rgba(96, 165, 250, 0.3);
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        border: none;
         color: white;
         border-radius: 8px;
         font-weight: 600;
+        padding: 0.75rem 1.5rem;
         transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
     }
     
     .stButton > button:hover {
-        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e3a8a 100%);
         transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
     }
     
     /* ファイルアップローダー */
     .stFileUploader > div {
-        background: rgba(30, 64, 175, 0.6);
-        border: 2px dashed rgba(96, 165, 250, 0.4);
-        border-radius: 10px;
+        border: 2px dashed #3b82f6;
+        border-radius: 12px;
+        background: #f8fafc;
+        padding: 2rem;
+        text-align: center;
+    }
+    
+    .stFileUploader > div:hover {
+        background: #eff6ff;
+        border-color: #1d4ed8;
     }
     
     /* データフレーム */
     .stDataFrame {
-        background: rgba(30, 64, 175, 0.3);
-        border-radius: 10px;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
         overflow: hidden;
     }
     
     /* エキスパンダー */
     .streamlit-expanderHeader {
-        background: rgba(30, 64, 175, 0.6);
-        border: 1px solid rgba(96, 165, 250, 0.3);
-        color: #93c5fd;
+        background-color: #f8fafc;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        color: #1e40af;
+        font-weight: 600;
     }
     
-    /* メトリクス */
+    .streamlit-expanderHeader:hover {
+        background-color: #eff6ff;
+        border-color: #3b82f6;
+    }
+    
+    /* メトリクス表示の改善 */
     .metric-container {
-        background: rgba(30, 64, 175, 0.6);
+        background: #ffffff;
         padding: 1rem;
         border-radius: 8px;
-        border: 1px solid rgba(96, 165, 250, 0.3);
+        border: 2px solid #e2e8f0;
+        margin: 0.5rem 0;
     }
     
     /* プログレスバー */
     .progress-bar {
         width: 100%;
-        height: 6px;
-        background: rgba(30, 64, 175, 0.4);
-        border-radius: 3px;
+        height: 8px;
+        background-color: #e2e8f0;
+        border-radius: 4px;
         overflow: hidden;
         margin: 0.5rem 0;
     }
     
     .progress-fill {
         height: 100%;
-        background: linear-gradient(90deg, #60a5fa 0%, #3b82f6 100%);
+        background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
         transition: width 0.3s ease;
-        box-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
-    }
-    
-    /* スクロールバー */
-    ::-webkit-scrollbar {
-        width: 8px;
-    }
-    
-    ::-webkit-scrollbar-track {
-        background: rgba(30, 58, 138, 0.3);
-    }
-    
-    ::-webkit-scrollbar-thumb {
-        background: linear-gradient(180deg, #60a5fa, #3b82f6);
-        border-radius: 4px;
-    }
-    
-    ::-webkit-scrollbar-thumb:hover {
-        background: linear-gradient(180deg, #3b82f6, #2563eb);
     }
     
     /* テキストの色調整 */
     h1, h2, h3, h4, h5, h6 {
-        color: #93c5fd !important;
-    }
-    
-    p, span, div {
-        color: #d1d5db;
+        color: #1e40af !important;
     }
     
     /* リンクの色 */
     a {
-        color: #60a5fa;
+        color: #3b82f6;
+        text-decoration: none;
     }
     
     a:hover {
-        color: #93c5fd;
+        color: #1d4ed8;
+        text-decoration: underline;
+    }
+    
+    /* スピナー */
+    .stSpinner > div {
+        border-top-color: #3b82f6 !important;
+    }
+    
+    /* 成功・エラーメッセージ */
+    .stSuccess {
+        background-color: #f0fdf4;
+        border: 1px solid #22c55e;
+        color: #15803d;
+    }
+    
+    .stError {
+        background-color: #fef2f2;
+        border: 1px solid #ef4444;
+        color: #dc2626;
+    }
+    
+    .stWarning {
+        background-color: #fffbeb;
+        border: 1px solid #f59e0b;
+        color: #d97706;
+    }
+    
+    .stInfo {
+        background-color: #eff6ff;
+        border: 1px solid #3b82f6;
+        color: #1d4ed8;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -417,20 +480,6 @@ def get_localStorage_script():
 def initialize_localStorage():
     """localStorageを初期化し、既存データを読み込む"""
     components.html(get_localStorage_script(), height=0)
-    
-    # localStorageからデータを読み込む（JavaScript実行）
-    load_script = """
-    <script>
-    if (window.teleapoStorage) {
-        const jobs = window.teleapoStorage.load();
-        window.parent.postMessage({
-            type: 'jobs_loaded',
-            jobs: jobs
-        }, '*');
-    }
-    </script>
-    """
-    components.html(load_script, height=0)
 
 # ジョブをlocalStorageに保存
 def save_jobs_to_localStorage(jobs):
@@ -465,7 +514,7 @@ def clear_localStorage():
     """
     components.html(clear_script, height=0)
 
-# セッション状態の初期化（改良版）
+# セッション状態の初期化
 def initialize_session_state():
     """セッション状態を初期化"""
     if 'jobs' not in st.session_state:
@@ -474,23 +523,6 @@ def initialize_session_state():
         st.session_state.current_job = None
     if 'localStorage_initialized' not in st.session_state:
         st.session_state.localStorage_initialized = False
-
-# ジョブ履歴の復元
-def restore_jobs_from_localStorage():
-    """localStorageからジョブ履歴を復元"""
-    if not st.session_state.localStorage_initialized:
-        # 復元用のプレースホルダー
-        restore_placeholder = st.empty()
-        
-        with restore_placeholder.container():
-            st.info("🔄 ジョブ履歴を復元中...")
-            
-        # localStorageからの復元を試行
-        # 実際の実装では、JavaScript側からのメッセージを待つ必要がある
-        # ここでは簡略化して、セッション状態のみ使用
-        
-        st.session_state.localStorage_initialized = True
-        restore_placeholder.empty()
 
 class AITeleapoManager:
     def __init__(self):
@@ -776,9 +808,9 @@ class AITeleapoManager:
             'result_counts': result_counts.to_dict()
         }
 
-# 改良されたジョブカード表示関数（ダークテーマ対応）
+# 改良されたジョブカード表示関数
 def display_job_card(job):
-    """ダークテーマ対応のジョブカードを表示"""
+    """見やすいジョブカードを表示"""
     status_class = f"status-{job.get('status', 'created')}"
     created_at = job['created_at']
     if isinstance(created_at, str):
@@ -787,7 +819,7 @@ def display_job_card(job):
     st.markdown(f"""
     <div class="job-card">
         <div class="job-card-header">
-            <span class="small-icon">🎯</span> {job['job_id']} - {job['output_name']}
+            <span>🎯 {job['job_id']} - {job['output_name']}</span>
             <span class="status-badge {status_class}">
                 <span class="small-icon">●</span> {job['status']}
             </span>
@@ -821,16 +853,18 @@ def display_job_card(job):
     </div>
     """, unsafe_allow_html=True)
 
-# 統計メトリクス表示関数（ダークテーマ対応）
+# 統計メトリクス表示関数
 def display_metrics(stats):
-    """ダークテーマ対応の統計メトリクスを表示"""
+    """統計メトリクスを表示"""
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-value">{stats['total_calls']:,}</div>
-            <div class="metric-label">📞 総架電数</div>
+            <div class="metric-label">
+                <span class="small-icon">📞</span> 総架電数
+            </div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -838,7 +872,9 @@ def display_metrics(stats):
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-value">{stats['valid_calls']:,}</div>
-            <div class="metric-label">✅ 有効通話</div>
+            <div class="metric-label">
+                <span class="small-icon">✅</span> 有効通話
+            </div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -846,7 +882,9 @@ def display_metrics(stats):
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-value">{stats['transfer_calls']:,}</div>
-            <div class="metric-label">🎯 APO獲得</div>
+            <div class="metric-label">
+                <span class="small-icon">🎯</span> APO獲得
+            </div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -855,7 +893,9 @@ def display_metrics(stats):
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-value">{apo_rate:.1f}%</div>
-            <div class="metric-label">📈 APO率</div>
+            <div class="metric-label">
+                <span class="small-icon">📈</span> APO率
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -867,14 +907,11 @@ def main():
     # localStorage初期化
     initialize_localStorage()
     
-    # ジョブ履歴の復元
-    restore_jobs_from_localStorage()
-    
     st.markdown('<h1 class="main-header">📞 AIテレアポ管理システム</h1>', unsafe_allow_html=True)
     
     manager = AITeleapoManager()
     
-    # サイドバー（ダークテーマ対応）
+    # サイドバー
     st.sidebar.title("🎛️ 操作メニュー")
     
     # システム情報を表示
@@ -883,7 +920,7 @@ def main():
         <h4><span class="small-icon">📊</span> システム情報</h4>
         <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
         <p><strong>保存場所:</strong> {manager.base_dir.name}/</p>
-        <p><strong>バージョン:</strong> 2.2.0 (ダークテーマ)</p>
+        <p><strong>バージョン:</strong> 2.3.0 (クリーンUI)</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -893,7 +930,7 @@ def main():
     )
     
     if menu == "📤 新規ジョブ作成":
-        st.header("📤 新規ジョブ作成")
+        st.markdown('<h2 class="section-header"><span class="small-icon">📤</span> 新規ジョブ作成</h2>', unsafe_allow_html=True)
         
         col1, col2 = st.columns([2, 1])
         
@@ -993,7 +1030,7 @@ def main():
             """, unsafe_allow_html=True)
     
     elif menu == "📥 結果分析":
-        st.header("📥 結果分析")
+        st.markdown('<h2 class="section-header"><span class="small-icon">📥</span> 結果分析</h2>', unsafe_allow_html=True)
         
         col1, col2 = st.columns([2, 1])
         
@@ -1065,21 +1102,27 @@ def main():
                                 st.markdown(f"""
                                 <div class="metric-card">
                                     <div class="metric-value">{stats['total_time']}</div>
-                                    <div class="metric-label">⏱️ 総通話時間</div>
+                                    <div class="metric-label">
+                                        <span class="small-icon">⏱️</span> 総通話時間
+                                    </div>
                                 </div>
                                 """, unsafe_allow_html=True)
                             with col_b:
                                 st.markdown(f"""
                                 <div class="metric-card">
                                     <div class="metric-value">{stats['invalid_numbers']}</div>
-                                    <div class="metric-label">❌ 無効番号</div>
+                                    <div class="metric-label">
+                                        <span class="small-icon">❌</span> 無効番号
+                                    </div>
                                 </div>
                                 """, unsafe_allow_html=True)
                             with col_c:
                                 st.markdown(f"""
                                 <div class="metric-card">
                                     <div class="metric-value">{stats['error_calls']}</div>
-                                    <div class="metric-label">⚠️ エラー件数</div>
+                                    <div class="metric-label">
+                                        <span class="small-icon">⚠️</span> エラー件数
+                                    </div>
                                 </div>
                                 """, unsafe_allow_html=True)
                             
@@ -1161,7 +1204,7 @@ def main():
             """, unsafe_allow_html=True)
     
     elif menu == "📊 ジョブ履歴":
-        st.header("📊 ジョブ履歴")
+        st.markdown('<h2 class="section-header"><span class="small-icon">📊</span> ジョブ履歴</h2>', unsafe_allow_html=True)
         
         if st.session_state.jobs:
             st.subheader("📋 作成済みジョブ一覧")
@@ -1186,7 +1229,7 @@ def main():
             """, unsafe_allow_html=True)
     
     elif menu == "⚙️ 設定":
-        st.header("⚙️ 設定")
+        st.markdown('<h2 class="section-header"><span class="small-icon">⚙️</span> 設定</h2>', unsafe_allow_html=True)
         
         st.subheader("🗂️ ジョブデータ管理")
         
@@ -1210,8 +1253,8 @@ def main():
             <p><strong>ジョブ保存場所:</strong> {manager.base_dir.absolute()}</p>
             <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
             <p><strong>localStorage対応:</strong> ✅ 有効</p>
-            <p><strong>バージョン:</strong> 2.2.0 (ダークテーマ対応版)</p>
-            <p><strong>新機能:</strong> 青ベースダークテーマ、小さなアイコン、背景色対応</p>
+            <p><strong>バージョン:</strong> 2.3.0 (クリーンUI対応版)</p>
+            <p><strong>新機能:</strong> 白背景、青ベース配色、見やすいレイアウト</p>
         </div>
         """, unsafe_allow_html=True)
         
