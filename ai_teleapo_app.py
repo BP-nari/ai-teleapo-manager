@@ -1122,77 +1122,59 @@ def main():
                                 help="FileMakerに取り込むためのExcelファイル名"
                             )
                             
-                            if st.button("💾 結果を保存", type="primary", key=f"save_result_{selected_job_id}"):
-                                try:
-                                    st.info("📊 Excelファイルを生成中...")
-                                    
-                                    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-                                    final_filename = f"{output_filename}_{timestamp}.xlsx"
-                                    
-                                    # デバッグ情報
-                                    st.write(f"デバッグ: merged_df の行数 = {len(merged_df)}")
-                                    st.write(f"デバッグ: ファイル名 = {final_filename}")
-                                    
-                                    # メモリ上でExcelファイルを作成
-                                    buffer = BytesIO()
-                                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                                        merged_df.to_excel(writer, index=False, sheet_name='分析結果')
-                                    
-                                    buffer.seek(0)
-                                    excel_data = buffer.getvalue()
-                                    
-                                    st.write(f"デバッグ: Excelデータサイズ = {len(excel_data)} bytes")
-                                    
-                                    # セッション状態に直接保存
-                                    download_key = f'download_data_{selected_job_id}'
-                                    st.session_state[download_key] = {
-                                        'data': excel_data,
-                                        'filename': final_filename,
-                                        'timestamp': timestamp,
-                                        'row_count': len(merged_df)
-                                    }
-                                    
-                                    st.write(f"デバッグ: セッション状態に保存完了 - キー: {download_key}")
-                                    
-                                    st.success("✅ 結果が保存されました！下のダウンロードボタンからファイルを取得してください。")
-                                    st.rerun()  # ページを再実行してダウンロードボタンを表示
-                                    
-                                except Exception as e:
-                                    st.error(f"❌ ファイル生成エラー: {str(e)}")
-                                    st.error(f"❌ エラー詳細: {type(e).__name__}")
-                                    import traceback
-                                    st.error(f"❌ スタックトレース: {traceback.format_exc()}")
+                            # 結果を保存してダウンロードボタンを表示
+                            col_save, col_download = st.columns([1, 1])
                             
-                            # ダウンロードボタンを常時表示（データがある場合）
-                            download_data_key = f'download_data_{selected_job_id}'
-                            if download_data_key in st.session_state:
-                                download_info = st.session_state[download_data_key]
-                                
+                            with col_save:
+                                if st.button("💾 結果を保存", type="primary", key=f"save_result_{selected_job_id}"):
+                                    try:
+                                        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+                                        final_filename = f"{output_filename}_{timestamp}.xlsx"
+                                        
+                                        # メモリ上でExcelファイルを作成
+                                        buffer = BytesIO()
+                                        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                                            merged_df.to_excel(writer, index=False, sheet_name='分析結果')
+                                        buffer.seek(0)
+                                        excel_data = buffer.getvalue()
+                                        
+                                        # セッション状態に直接保存
+                                        st.session_state[f'excel_data_{selected_job_id}'] = excel_data
+                                        st.session_state[f'excel_filename_{selected_job_id}'] = final_filename
+                                        st.session_state[f'excel_ready_{selected_job_id}'] = True
+                                        
+                                        st.success("✅ 保存完了！")
+                                        
+                                    except Exception as e:
+                                        st.error(f"❌ エラー: {str(e)}")
+                            
+                            with col_download:
+                                # ダウンロードボタンを常に表示（データがある場合）
+                                if st.session_state.get(f'excel_ready_{selected_job_id}', False):
+                                    excel_data = st.session_state[f'excel_data_{selected_job_id}']
+                                    filename = st.session_state[f'excel_filename_{selected_job_id}']
+                                    
+                                    st.download_button(
+                                        label="📊 結果をダウンロード",
+                                        data=excel_data,
+                                        file_name=filename,
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        key=f"download_{selected_job_id}",
+                                        type="primary"
+                                    )
+                                else:
+                                    st.info("まず「結果を保存」をクリックしてください")
+                            
+                            # 保存済みの場合は詳細情報を表示
+                            if st.session_state.get(f'excel_ready_{selected_job_id}', False):
                                 st.markdown(f"""
                                 <div class="success-box">
-                                    <h4>✅ 分析完了！</h4>
-                                    <p><strong>ファイル:</strong> {download_info['filename']}</p>
-                                    <p><strong>データ件数:</strong> {download_info['row_count']:,} 件</p>
-                                    <p>FileMakerに取り込み可能な形式で保存されました。</p>
+                                    <h4>✅ ダウンロード準備完了！</h4>
+                                    <p><strong>ファイル:</strong> {st.session_state[f'excel_filename_{selected_job_id}']}</p>
+                                    <p><strong>データ件数:</strong> {len(merged_df):,} 件</p>
+                                    <p>上の「📊 結果をダウンロード」ボタンからファイルを取得してください。</p>
                                 </div>
                                 """, unsafe_allow_html=True)
-                                
-                                # ダウンロードセクション
-                                st.markdown("""
-                                <div class="download-section">
-                                    <h4>📥 分析結果ダウンロード</h4>
-                                    <p>FileMakerに取り込み可能な形式で保存されました。</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                
-                                # ダウンロードボタン
-                                st.download_button(
-                                    label="📊 分析結果をダウンロード",
-                                    data=download_info['data'],
-                                    file_name=download_info['filename'],
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                    key=f"download_result_{selected_job_id}_{download_info['timestamp']}"
-                                )
                             
                             # データプレビュー
                             with st.expander("📋 分析済みデータプレビュー"):
