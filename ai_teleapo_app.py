@@ -357,23 +357,40 @@ st.markdown("""
         text-align: center;
     }
     
-    .download-button {
+    /* 直接ダウンロードリンクのスタイル */
+    .download-link {
+        display: inline-block;
         background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-        color: white;
+        color: white !important;
         padding: 1rem 2rem;
         border-radius: 8px;
         font-weight: 600;
         font-size: 1.1rem;
-        border: none;
-        cursor: pointer;
+        text-decoration: none;
         transition: all 0.3s ease;
         box-shadow: 0 4px 6px rgba(34, 197, 94, 0.2);
+        margin: 0.5rem;
     }
     
-    .download-button:hover {
+    .download-link:hover {
         background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
         transform: translateY(-2px);
         box-shadow: 0 6px 12px rgba(34, 197, 94, 0.3);
+        color: white !important;
+        text-decoration: none;
+    }
+    
+    /* ファイルパス表示 */
+    .file-path {
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        padding: 0.75rem;
+        font-family: monospace;
+        font-size: 0.9rem;
+        color: #475569;
+        margin: 0.5rem 0;
+        word-break: break-all;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -483,42 +500,35 @@ def initialize_session_state():
         st.session_state.current_job = None
     if 'localStorage_initialized' not in st.session_state:
         st.session_state.localStorage_initialized = False
-    if 'download_data' not in st.session_state:
-        st.session_state.download_data = {}
 
-# ファイルダウンロード用の安全な関数
-def create_download_data(data, filename, mime_type):
-    """ダウンロード用データを安全に作成してセッション状態に保存"""
+# ダウンロード用のHTMLリンクを生成
+def create_download_link(file_path, display_name, icon="📥"):
+    """ファイルダウンロード用のHTMLリンクを生成"""
     try:
-        # データをBase64エンコードして保存
-        if isinstance(data, bytes):
-            encoded_data = base64.b64encode(data).decode()
-        else:
-            encoded_data = base64.b64encode(data.encode()).decode()
+        # ファイルが存在するかチェック
+        if not os.path.exists(file_path):
+            return f"<p style='color: red;'>❌ ファイルが見つかりません: {file_path}</p>"
         
-        download_key = f"{filename}_{int(time.time())}"
-        st.session_state.download_data[download_key] = {
-            'data': encoded_data,
-            'filename': filename,
-            'mime_type': mime_type,
-            'created_at': datetime.now()
-        }
-        return download_key
+        # ファイルサイズを取得
+        file_size = os.path.getsize(file_path)
+        size_mb = file_size / (1024 * 1024)
+        
+        # 相対パスに変換（Streamlitのstatic file serving用）
+        relative_path = os.path.relpath(file_path, os.getcwd())
+        
+        return f"""
+        <div class="download-section">
+            <h4>{icon} {display_name}</h4>
+            <p><strong>ファイルサイズ:</strong> {size_mb:.2f} MB</p>
+            <div class="file-path">📁 {relative_path}</div>
+            <p>⬇️ 右クリックして「名前を付けてリンク先を保存」でダウンロードしてください</p>
+            <a href="/{relative_path}" class="download-link" target="_blank" download="{os.path.basename(file_path)}">
+                {icon} {display_name}をダウンロード
+            </a>
+        </div>
+        """
     except Exception as e:
-        st.error(f"ダウンロードデータの作成に失敗しました: {str(e)}")
-        return None
-
-def get_download_data(download_key):
-    """セッション状態からダウンロードデータを取得"""
-    try:
-        if download_key in st.session_state.download_data:
-            data_info = st.session_state.download_data[download_key]
-            decoded_data = base64.b64decode(data_info['data'])
-            return decoded_data, data_info['filename'], data_info['mime_type']
-        return None, None, None
-    except Exception as e:
-        st.error(f"ダウンロードデータの取得に失敗しました: {str(e)}")
-        return None, None, None
+        return f"<p style='color: red;'>❌ ダウンロードリンク生成エラー: {str(e)}</p>"
 
 class AITeleapoManager:
     def __init__(self):
@@ -753,6 +763,18 @@ class AITeleapoManager:
         
         return merged_df
     
+    def save_analysis_result(self, merged_df, job_id, output_filename):
+        """分析結果をファイルに保存"""
+        job_dir = self.base_dir / job_id
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        final_filename = f"{output_filename}_{timestamp}.xlsx"
+        result_path = job_dir / final_filename
+        
+        # Excelファイルとして保存
+        merged_df.to_excel(result_path, index=False, engine='openpyxl')
+        
+        return result_path, final_filename
+    
     def calculate_statistics(self, df):
         """統計を計算"""
         def parse_duration(val):
@@ -916,7 +938,7 @@ def main():
         <h4><span class="small-icon">📊</span> システム情報</h4>
         <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
         <p><strong>保存場所:</strong> {manager.base_dir.name}/</p>
-        <p><strong>バージョン:</strong> 2.4.0 (ダウンロード修正版)</p>
+        <p><strong>バージョン:</strong> 3.0.0 (直接ダウンロード対応版)</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -999,32 +1021,14 @@ def main():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # ファイルを読み込んでダウンロード用データを作成
-                            try:
-                                with open(result['upload_path'], 'rb') as f:
-                                    file_data = f.read()
-                                
-                                final_filename = f"{output_name}_{job_id}.csv"
-                                
-                                # ダウンロードボタン（改良版）
-                                st.markdown("""
-                                <div class="download-section">
-                                    <h4>📥 ファイルダウンロード</h4>
-                                    <p>AIテレアポシステムにアップロードするCSVファイルをダウンロードしてください。</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                
-                                st.download_button(
-                                    label="📥 AIテレアポ用CSVをダウンロード",
-                                    data=file_data,
-                                    file_name=final_filename,
-                                    mime="text/csv",
-                                    help="日本語対応エンコーディングで保存されています",
-                                    key=f"download_{job_id}"
-                                )
-                                
-                            except Exception as e:
-                                st.error(f"❌ ファイル読み込みエラー: {str(e)}")
+                            # 直接ダウンロードリンクを生成
+                            final_filename = f"{output_name}_{job_id}.csv"
+                            download_html = create_download_link(
+                                str(result['upload_path']), 
+                                final_filename,
+                                "📥"
+                            )
+                            st.markdown(download_html, unsafe_allow_html=True)
                 
                 except Exception as e:
                     st.error(f"❌ ファイル処理エラー: {str(e)}")
@@ -1171,35 +1175,9 @@ def main():
                             
                             if st.button("💾 結果を保存", type="primary"):
                                 try:
-                                    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-                                    final_filename = f"{output_filename}_{timestamp}.xlsx"
-                                    
-                                    # メモリ上でExcelファイルを作成（改良版）
-                                    buffer = BytesIO()
-                                    
-                                    # ExcelWriterを使用してより確実にファイルを作成
-                                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                                        merged_df.to_excel(writer, index=False, sheet_name='分析結果')
-                                    
-                                    # バッファの位置を先頭に戻す
-                                    buffer.seek(0)
-                                    excel_data = buffer.getvalue()
-                                    
-                                    # ダウンロードセクション
-                                    st.markdown("""
-                                    <div class="download-section">
-                                        <h4>📥 分析結果ダウンロード</h4>
-                                        <p>FileMakerに取り込み可能な形式で保存されました。</p>
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                                    
-                                    # ダウンロードボタン（改良版）
-                                    st.download_button(
-                                        label="📥 分析結果をダウンロード",
-                                        data=excel_data,
-                                        file_name=final_filename,
-                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                        key=f"download_result_{selected_job_id}_{timestamp}"
+                                    # ファイルに保存
+                                    result_path, final_filename = manager.save_analysis_result(
+                                        merged_df, selected_job_id, output_filename
                                     )
                                     
                                     st.markdown(f"""
@@ -1211,8 +1189,16 @@ def main():
                                     </div>
                                     """, unsafe_allow_html=True)
                                     
+                                    # 直接ダウンロードリンクを生成
+                                    download_html = create_download_link(
+                                        str(result_path), 
+                                        final_filename,
+                                        "📊"
+                                    )
+                                    st.markdown(download_html, unsafe_allow_html=True)
+                                    
                                 except Exception as e:
-                                    st.error(f"❌ ファイル生成エラー: {str(e)}")
+                                    st.error(f"❌ ファイル保存エラー: {str(e)}")
                             
                             # データプレビュー
                             with st.expander("📋 分析済みデータプレビュー"):
@@ -1285,21 +1271,20 @@ def main():
             <p><strong>ジョブ保存場所:</strong> {manager.base_dir.absolute()}</p>
             <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
             <p><strong>localStorage対応:</strong> ✅ 有効</p>
-            <p><strong>バージョン:</strong> 2.4.0 (ダウンロード修正版)</p>
-            <p><strong>新機能:</strong> 確実なファイルダウンロード、エラーハンドリング強化</p>
+            <p><strong>バージョン:</strong> 3.0.0 (直接ダウンロード対応版)</p>
+            <p><strong>新機能:</strong> 直接ファイルリンク、確実なダウンロード</p>
         </div>
         """, unsafe_allow_html=True)
         
-        st.subheader("🔧 localStorage詳細")
+        st.subheader("🔧 ダウンロード方法")
         st.markdown("""
         <div class="sidebar-section">
-            <h4><span class="small-icon">💾</span> データ永続化について</h4>
+            <h4><span class="small-icon">💾</span> ファイルダウンロードについて</h4>
             <ul>
-                <li><strong>保存場所:</strong> ブラウザのlocalStorage</li>
-                <li><strong>保存内容:</strong> ジョブ履歴（ID、作成日時、設定など）</li>
-                <li><strong>容量制限:</strong> 通常5-10MB（ブラウザ依存）</li>
-                <li><strong>有効期限:</strong> 無期限（手動削除まで）</li>
-                <li><strong>共有範囲:</strong> 同一ドメインのみ</li>
+                <li><strong>方法1:</strong> ダウンロードボタンをクリック</li>
+                <li><strong>方法2:</strong> リンクを右クリック → 「名前を付けてリンク先を保存」</li>
+                <li><strong>保存場所:</strong> ブラウザのダウンロードフォルダ</li>
+                <li><strong>ファイル形式:</strong> CSV（新規作成）、Excel（結果分析）</li>
             </ul>
             <p><small>※ teleapo_jobs/ 内のファイルは従来通りサーバー側に保持されます</small></p>
         </div>
