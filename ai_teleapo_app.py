@@ -17,39 +17,72 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# カスタムCSS（改良版）
+# 青ベースダークテーマのカスタムCSS
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2.8rem;
-        color: #1f77b4;
-        text-align: center;
-        margin-bottom: 2rem;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    /* 全体の背景色を青ベースのダークテーマに */
+    .stApp {
+        background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 50%, #1d4ed8 100%);
+        color: #e5e7eb;
     }
     
+    /* メインコンテンツエリア */
+    .main .block-container {
+        background: rgba(30, 58, 138, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 2rem;
+        margin-top: 1rem;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    
+    /* サイドバー */
+    .css-1d391kg {
+        background: linear-gradient(180deg, #1e3a8a 0%, #1e40af 100%);
+    }
+    
+    .css-1d391kg .css-1v0mbdj {
+        background: transparent;
+    }
+    
+    /* ヘッダー */
+    .main-header {
+        font-size: 2.5rem;
+        color: #60a5fa;
+        text-align: center;
+        margin-bottom: 2rem;
+        text-shadow: 0 0 20px rgba(96, 165, 250, 0.5);
+        font-weight: 700;
+    }
+    
+    /* ジョブカード - ダークテーマ */
     .job-card {
-        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        background: linear-gradient(135deg, rgba(30, 58, 138, 0.8) 0%, rgba(30, 64, 175, 0.8) 100%);
         padding: 1.5rem;
-        border-radius: 12px;
+        border-radius: 15px;
         margin: 1rem 0;
-        border: 1px solid #dee2e6;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border: 1px solid rgba(59, 130, 246, 0.4);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
     }
     
     .job-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        transform: translateY(-3px);
+        box-shadow: 0 12px 40px rgba(59, 130, 246, 0.3);
+        border-color: rgba(96, 165, 250, 0.6);
     }
     
     .job-card-header {
         font-size: 1.2rem;
         font-weight: bold;
-        color: #495057;
-        margin-bottom: 0.5rem;
-        border-bottom: 2px solid #007bff;
+        color: #93c5fd;
+        margin-bottom: 0.8rem;
+        border-bottom: 2px solid #3b82f6;
         padding-bottom: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
     }
     
     .job-info-grid {
@@ -60,121 +93,264 @@ st.markdown("""
     }
     
     .job-info-item {
-        background: white;
-        padding: 0.8rem;
-        border-radius: 8px;
-        border-left: 4px solid #007bff;
+        background: rgba(30, 64, 175, 0.6);
+        padding: 1rem;
+        border-radius: 10px;
+        border-left: 4px solid #60a5fa;
+        backdrop-filter: blur(5px);
     }
     
     .job-info-label {
-        font-size: 0.85rem;
-        color: #6c757d;
+        font-size: 0.8rem;
+        color: #93c5fd;
         font-weight: 500;
-        margin-bottom: 0.2rem;
+        margin-bottom: 0.3rem;
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
     }
     
     .job-info-value {
         font-size: 1rem;
-        color: #212529;
+        color: #e5e7eb;
         font-weight: 600;
     }
     
+    /* 成功ボックス - ダークテーマ */
     .success-box {
-        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-        border: 1px solid #c3e6cb;
-        color: #155724;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, rgba(5, 150, 105, 0.2) 100%);
+        border: 1px solid rgba(16, 185, 129, 0.4);
+        color: #6ee7b7;
         padding: 1.5rem;
         border-radius: 12px;
         margin: 1rem 0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.1);
+        backdrop-filter: blur(10px);
     }
     
+    /* 警告ボックス - ダークテーマ */
     .warning-box {
-        background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-        border: 1px solid #ffeaa7;
-        color: #856404;
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(217, 119, 6, 0.2) 100%);
+        border: 1px solid rgba(245, 158, 11, 0.4);
+        color: #fbbf24;
         padding: 1.5rem;
         border-radius: 12px;
         margin: 1rem 0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 20px rgba(245, 158, 11, 0.1);
+        backdrop-filter: blur(10px);
     }
     
+    /* 情報ボックス - ダークテーマ */
     .info-box {
-        background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
-        border: 1px solid #bee5eb;
-        color: #0c5460;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(37, 99, 235, 0.2) 100%);
+        border: 1px solid rgba(59, 130, 246, 0.4);
+        color: #93c5fd;
         padding: 1.5rem;
         border-radius: 12px;
         margin: 1rem 0;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1);
+        backdrop-filter: blur(10px);
     }
     
+    /* メトリクスカード - ダークテーマ */
     .metric-card {
-        background: white;
-        padding: 1rem;
-        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(30, 64, 175, 0.8) 0%, rgba(37, 99, 235, 0.8) 100%);
+        padding: 1.5rem;
+        border-radius: 12px;
         text-align: center;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        border-top: 3px solid #007bff;
+        box-shadow: 0 6px 25px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(96, 165, 250, 0.3);
+        backdrop-filter: blur(10px);
+        transition: all 0.3s ease;
+    }
+    
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(96, 165, 250, 0.2);
     }
     
     .metric-value {
-        font-size: 2rem;
+        font-size: 2.2rem;
         font-weight: bold;
-        color: #007bff;
+        color: #60a5fa;
+        text-shadow: 0 0 10px rgba(96, 165, 250, 0.3);
     }
     
     .metric-label {
         font-size: 0.9rem;
-        color: #6c757d;
+        color: #93c5fd;
         margin-top: 0.5rem;
-    }
-    
-    .sidebar-section {
-        background: #f8f9fa;
-        padding: 1rem;
-        border-radius: 8px;
-        margin: 1rem 0;
-        border-left: 4px solid #007bff;
-    }
-    
-    .status-badge {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        border-radius: 20px;
-        font-size: 0.8rem;
         font-weight: 500;
+    }
+    
+    /* サイドバーセクション - ダークテーマ */
+    .sidebar-section {
+        background: rgba(30, 64, 175, 0.6);
+        padding: 1.2rem;
+        border-radius: 10px;
+        margin: 1rem 0;
+        border-left: 4px solid #60a5fa;
+        backdrop-filter: blur(5px);
+        border: 1px solid rgba(96, 165, 250, 0.2);
+    }
+    
+    .sidebar-section h4 {
+        color: #93c5fd;
+        margin-bottom: 0.8rem;
+        font-size: 1.1rem;
+    }
+    
+    .sidebar-section p, .sidebar-section li {
+        color: #d1d5db;
+        font-size: 0.9rem;
+        line-height: 1.5;
+    }
+    
+    /* ステータスバッジ */
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.3rem 0.8rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
         text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     
     .status-created {
-        background-color: #d4edda;
-        color: #155724;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.3));
+        color: #6ee7b7;
+        border: 1px solid rgba(16, 185, 129, 0.5);
     }
     
     .status-processing {
-        background-color: #fff3cd;
-        color: #856404;
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(217, 119, 6, 0.3));
+        color: #fbbf24;
+        border: 1px solid rgba(245, 158, 11, 0.5);
     }
     
     .status-completed {
-        background-color: #d1ecf1;
-        color: #0c5460;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(37, 99, 235, 0.3));
+        color: #93c5fd;
+        border: 1px solid rgba(59, 130, 246, 0.5);
     }
     
+    /* 小さなアイコン */
+    .small-icon {
+        font-size: 0.8rem;
+        opacity: 0.8;
+    }
+    
+    /* Streamlitコンポーネントのスタイル調整 */
+    .stSelectbox > div > div {
+        background: rgba(30, 64, 175, 0.6);
+        border: 1px solid rgba(96, 165, 250, 0.3);
+        color: #e5e7eb;
+    }
+    
+    .stTextInput > div > div > input {
+        background: rgba(30, 64, 175, 0.6);
+        border: 1px solid rgba(96, 165, 250, 0.3);
+        color: #e5e7eb;
+    }
+    
+    .stButton > button {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        border: 1px solid rgba(96, 165, 250, 0.3);
+        color: white;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+        transform: translateY(-1px);
+    }
+    
+    /* ファイルアップローダー */
+    .stFileUploader > div {
+        background: rgba(30, 64, 175, 0.6);
+        border: 2px dashed rgba(96, 165, 250, 0.4);
+        border-radius: 10px;
+    }
+    
+    /* データフレーム */
+    .stDataFrame {
+        background: rgba(30, 64, 175, 0.3);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    /* エキスパンダー */
+    .streamlit-expanderHeader {
+        background: rgba(30, 64, 175, 0.6);
+        border: 1px solid rgba(96, 165, 250, 0.3);
+        color: #93c5fd;
+    }
+    
+    /* メトリクス */
+    .metric-container {
+        background: rgba(30, 64, 175, 0.6);
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid rgba(96, 165, 250, 0.3);
+    }
+    
+    /* プログレスバー */
     .progress-bar {
         width: 100%;
-        height: 8px;
-        background-color: #e9ecef;
-        border-radius: 4px;
+        height: 6px;
+        background: rgba(30, 64, 175, 0.4);
+        border-radius: 3px;
         overflow: hidden;
         margin: 0.5rem 0;
     }
     
     .progress-fill {
         height: 100%;
-        background: linear-gradient(90deg, #007bff 0%, #0056b3 100%);
+        background: linear-gradient(90deg, #60a5fa 0%, #3b82f6 100%);
         transition: width 0.3s ease;
+        box-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+    }
+    
+    /* スクロールバー */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: rgba(30, 58, 138, 0.3);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #60a5fa, #3b82f6);
+        border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #3b82f6, #2563eb);
+    }
+    
+    /* テキストの色調整 */
+    h1, h2, h3, h4, h5, h6 {
+        color: #93c5fd !important;
+    }
+    
+    p, span, div {
+        color: #d1d5db;
+    }
+    
+    /* リンクの色 */
+    a {
+        color: #60a5fa;
+    }
+    
+    a:hover {
+        color: #93c5fd;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -600,9 +776,9 @@ class AITeleapoManager:
             'result_counts': result_counts.to_dict()
         }
 
-# 改良されたジョブカード表示関数
+# 改良されたジョブカード表示関数（ダークテーマ対応）
 def display_job_card(job):
-    """改良されたジョブカードを表示"""
+    """ダークテーマ対応のジョブカードを表示"""
     status_class = f"status-{job.get('status', 'created')}"
     created_at = job['created_at']
     if isinstance(created_at, str):
@@ -611,40 +787,50 @@ def display_job_card(job):
     st.markdown(f"""
     <div class="job-card">
         <div class="job-card-header">
-            🎯 {job['job_id']} - {job['output_name']}
-            <span class="status-badge {status_class}">{job['status']}</span>
+            <span class="small-icon">🎯</span> {job['job_id']} - {job['output_name']}
+            <span class="status-badge {status_class}">
+                <span class="small-icon">●</span> {job['status']}
+            </span>
         </div>
         <div class="job-info-grid">
             <div class="job-info-item">
-                <div class="job-info-label">作成日時</div>
+                <div class="job-info-label">
+                    <span class="small-icon">📅</span> 作成日時
+                </div>
                 <div class="job-info-value">{created_at.strftime('%Y-%m-%d %H:%M:%S')}</div>
             </div>
             <div class="job-info-item">
-                <div class="job-info-label">元ファイル</div>
+                <div class="job-info-label">
+                    <span class="small-icon">📄</span> 元ファイル
+                </div>
                 <div class="job-info-value">{job['filename']}</div>
             </div>
             <div class="job-info-item">
-                <div class="job-info-label">ロボット台数</div>
+                <div class="job-info-label">
+                    <span class="small-icon">🤖</span> ロボット台数
+                </div>
                 <div class="job-info-value">{job['robot_count']} 台</div>
             </div>
             <div class="job-info-item">
-                <div class="job-info-label">処理件数</div>
+                <div class="job-info-label">
+                    <span class="small-icon">📊</span> 処理件数
+                </div>
                 <div class="job-info-value">{job['total_rows']:,} 件</div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-# 統計メトリクス表示関数
+# 統計メトリクス表示関数（ダークテーマ対応）
 def display_metrics(stats):
-    """統計メトリクスを改良されたデザインで表示"""
+    """ダークテーマ対応の統計メトリクスを表示"""
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-value">{stats['total_calls']:,}</div>
-            <div class="metric-label">総架電数</div>
+            <div class="metric-label">📞 総架電数</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -652,7 +838,7 @@ def display_metrics(stats):
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-value">{stats['valid_calls']:,}</div>
-            <div class="metric-label">有効通話</div>
+            <div class="metric-label">✅ 有効通話</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -660,7 +846,7 @@ def display_metrics(stats):
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-value">{stats['transfer_calls']:,}</div>
-            <div class="metric-label">APO獲得</div>
+            <div class="metric-label">🎯 APO獲得</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -669,7 +855,7 @@ def display_metrics(stats):
         st.markdown(f"""
         <div class="metric-card">
             <div class="metric-value">{apo_rate:.1f}%</div>
-            <div class="metric-label">APO率</div>
+            <div class="metric-label">📈 APO率</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -688,16 +874,16 @@ def main():
     
     manager = AITeleapoManager()
     
-    # サイドバー（改良版）
+    # サイドバー（ダークテーマ対応）
     st.sidebar.title("🎛️ 操作メニュー")
     
     # システム情報を表示
     st.sidebar.markdown(f"""
     <div class="sidebar-section">
-        <h4>📊 システム情報</h4>
+        <h4><span class="small-icon">📊</span> システム情報</h4>
         <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
         <p><strong>保存場所:</strong> {manager.base_dir.name}/</p>
-        <p><strong>バージョン:</strong> 2.1.0</p>
+        <p><strong>バージョン:</strong> 2.2.0 (ダークテーマ)</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -776,7 +962,7 @@ def main():
                                 <p><strong>ジョブID:</strong> {job_id}</p>
                                 <p><strong>処理件数:</strong> {result['total_rows']:,} 件</p>
                                 <p><strong>ロボット台数:</strong> {robot_count} 台</p>
-                                <p>📱 ジョブ履歴がブラウザに保存されました</p>
+                                <p><span class="small-icon">💾</span> ジョブ履歴がブラウザに保存されました</p>
                             </div>
                             """, unsafe_allow_html=True)
                             
@@ -796,12 +982,12 @@ def main():
         with col2:
             st.markdown("""
             <div class="sidebar-section">
-                <h4>📋 処理の流れ</h4>
+                <h4><span class="small-icon">📋</span> 処理の流れ</h4>
                 <ol>
-                    <li><strong>📁 ファイルアップロード</strong><br>FileMakerのExcelファイルを選択</li>
-                    <li><strong>⚙️ 設定</strong><br>出力ファイル名とロボット台数を指定</li>
-                    <li><strong>🚀 ジョブ作成</strong><br>データを変換・保存し、行指紋を生成</li>
-                    <li><strong>📥 ダウンロード</strong><br>AIテレアポ用CSVを取得してシステムにアップロード</li>
+                    <li><strong><span class="small-icon">📁</span> ファイルアップロード</strong><br>FileMakerのExcelファイルを選択</li>
+                    <li><strong><span class="small-icon">⚙️</span> 設定</strong><br>出力ファイル名とロボット台数を指定</li>
+                    <li><strong><span class="small-icon">🚀</span> ジョブ作成</strong><br>データを変換・保存し、行指紋を生成</li>
+                    <li><strong><span class="small-icon">📥</span> ダウンロード</strong><br>AIテレアポ用CSVを取得してシステムにアップロード</li>
                 </ol>
             </div>
             """, unsafe_allow_html=True)
@@ -876,11 +1062,26 @@ def main():
                             col_a, col_b, col_c = st.columns(3)
                             
                             with col_a:
-                                st.metric("総通話時間", stats['total_time'])
+                                st.markdown(f"""
+                                <div class="metric-card">
+                                    <div class="metric-value">{stats['total_time']}</div>
+                                    <div class="metric-label">⏱️ 総通話時間</div>
+                                </div>
+                                """, unsafe_allow_html=True)
                             with col_b:
-                                st.metric("無効番号", stats['invalid_numbers'])
+                                st.markdown(f"""
+                                <div class="metric-card">
+                                    <div class="metric-value">{stats['invalid_numbers']}</div>
+                                    <div class="metric-label">❌ 無効番号</div>
+                                </div>
+                                """, unsafe_allow_html=True)
                             with col_c:
-                                st.metric("エラー件数", stats['error_calls'])
+                                st.markdown(f"""
+                                <div class="metric-card">
+                                    <div class="metric-value">{stats['error_calls']}</div>
+                                    <div class="metric-label">⚠️ エラー件数</div>
+                                </div>
+                                """, unsafe_allow_html=True)
                             
                             # 結果分布
                             st.subheader("📊 架電結果分布")
@@ -898,7 +1099,7 @@ def main():
                             
                             st.markdown(f"""
                             <div class="info-box">
-                                <h4>📊 マッチング結果</h4>
+                                <h4><span class="small-icon">📊</span> マッチング結果</h4>
                                 <p><strong>マッチした件数:</strong> {matched_count:,} / {len(merged_df):,} 件</p>
                                 <p><strong>マッチ率:</strong> {match_rate:.1f}%</p>
                             </div>
@@ -948,13 +1149,13 @@ def main():
         with col2:
             st.markdown("""
             <div class="sidebar-section">
-                <h4>📋 分析の流れ</h4>
+                <h4><span class="small-icon">📋</span> 分析の流れ</h4>
                 <ol>
-                    <li><strong>🎯 ジョブ選択</strong><br>分析対象のジョブを選択</li>
-                    <li><strong>📊 結果アップロード</strong><br>AIテレアポの結果CSVを選択</li>
-                    <li><strong>🔍 自動分析</strong><br>通話結果を自動判定し統計情報を計算</li>
-                    <li><strong>🔗 データマージ</strong><br>社名ベースで元データと結合</li>
-                    <li><strong>💾 結果保存</strong><br>Excelファイルとして出力</li>
+                    <li><strong><span class="small-icon">🎯</span> ジョブ選択</strong><br>分析対象のジョブを選択</li>
+                    <li><strong><span class="small-icon">📊</span> 結果アップロード</strong><br>AIテレアポの結果CSVを選択</li>
+                    <li><strong><span class="small-icon">🔍</span> 自動分析</strong><br>通話結果を自動判定し統計情報を計算</li>
+                    <li><strong><span class="small-icon">🔗</span> データマージ</strong><br>社名ベースで元データと結合</li>
+                    <li><strong><span class="small-icon">💾</span> 結果保存</strong><br>Excelファイルとして出力</li>
                 </ol>
             </div>
             """, unsafe_allow_html=True)
@@ -966,7 +1167,7 @@ def main():
             st.subheader("📋 作成済みジョブ一覧")
             st.markdown(f"""
             <div class="info-box">
-                <h4>📱 localStorage対応</h4>
+                <h4><span class="small-icon">💾</span> localStorage対応</h4>
                 <p>ジョブ履歴はブラウザのlocalStorageに保存されており、ブラウザを閉じても次回訪問時に自動で復元されます。</p>
                 <p><strong>保存済みジョブ数:</strong> {len(st.session_state.jobs)} 件</p>
             </div>
@@ -978,7 +1179,7 @@ def main():
         else:
             st.markdown("""
             <div class="info-box">
-                <h4>📝 ジョブ履歴が空です</h4>
+                <h4><span class="small-icon">📝</span> ジョブ履歴が空です</h4>
                 <p>まだジョブが作成されていません。「📤 新規ジョブ作成」から最初のジョブを作成してください。</p>
                 <p>作成されたジョブは自動的にブラウザのlocalStorageに保存され、次回訪問時に復元されます。</p>
             </div>
@@ -1005,19 +1206,19 @@ def main():
         st.subheader("ℹ️ システム情報")
         st.markdown(f"""
         <div class="info-box">
-            <h4>📊 システム詳細</h4>
+            <h4><span class="small-icon">📊</span> システム詳細</h4>
             <p><strong>ジョブ保存場所:</strong> {manager.base_dir.absolute()}</p>
             <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
             <p><strong>localStorage対応:</strong> ✅ 有効</p>
-            <p><strong>バージョン:</strong> 2.1.0 (localStorage対応版)</p>
-            <p><strong>新機能:</strong> ブラウザ永続化、UI改善、レスポンシブデザイン</p>
+            <p><strong>バージョン:</strong> 2.2.0 (ダークテーマ対応版)</p>
+            <p><strong>新機能:</strong> 青ベースダークテーマ、小さなアイコン、背景色対応</p>
         </div>
         """, unsafe_allow_html=True)
         
         st.subheader("🔧 localStorage詳細")
         st.markdown("""
         <div class="sidebar-section">
-            <h4>💾 データ永続化について</h4>
+            <h4><span class="small-icon">💾</span> データ永続化について</h4>
             <ul>
                 <li><strong>保存場所:</strong> ブラウザのlocalStorage</li>
                 <li><strong>保存内容:</strong> ジョブ履歴（ID、作成日時、設定など）</li>
