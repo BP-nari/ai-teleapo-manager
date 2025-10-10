@@ -1253,8 +1253,7 @@ def main():
             <p><strong>ジョブ保存場所:</strong> {manager.base_dir.absolute()}</p>
             <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
             <p><strong>localStorage対応:</strong> ✅ 有効</p>
-            <p><strong>バージョン:</strong> 2.3.0 (クリーンUI対応版)</p>
-            <p><strong>新機能:</strong> 白背景、青ベース配色、見やすいレイアウト</p>
+            
         </div>
         """, unsafe_allow_html=True)
         
