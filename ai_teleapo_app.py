@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 import time
 import streamlit.components.v1 as components
+from io import BytesIO
+import base64
 
 # ページ設定
 st.set_page_config(
@@ -345,75 +347,33 @@ st.markdown("""
         border-color: #3b82f6;
     }
     
-    /* メトリクス表示の改善 */
-    .metric-container {
-        background: #ffffff;
-        padding: 1rem;
+    /* ダウンロードボタンの強調 */
+    .download-section {
+        background: #f0fdf4;
+        border: 2px solid #22c55e;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        text-align: center;
+    }
+    
+    .download-button {
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        color: white;
+        padding: 1rem 2rem;
         border-radius: 8px;
-        border: 2px solid #e2e8f0;
-        margin: 0.5rem 0;
+        font-weight: 600;
+        font-size: 1.1rem;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px rgba(34, 197, 94, 0.2);
     }
     
-    /* プログレスバー */
-    .progress-bar {
-        width: 100%;
-        height: 8px;
-        background-color: #e2e8f0;
-        border-radius: 4px;
-        overflow: hidden;
-        margin: 0.5rem 0;
-    }
-    
-    .progress-fill {
-        height: 100%;
-        background: linear-gradient(90deg, #3b82f6 0%, #1d4ed8 100%);
-        transition: width 0.3s ease;
-    }
-    
-    /* テキストの色調整 */
-    h1, h2, h3, h4, h5, h6 {
-        color: #1e40af !important;
-    }
-    
-    /* リンクの色 */
-    a {
-        color: #3b82f6;
-        text-decoration: none;
-    }
-    
-    a:hover {
-        color: #1d4ed8;
-        text-decoration: underline;
-    }
-    
-    /* スピナー */
-    .stSpinner > div {
-        border-top-color: #3b82f6 !important;
-    }
-    
-    /* 成功・エラーメッセージ */
-    .stSuccess {
-        background-color: #f0fdf4;
-        border: 1px solid #22c55e;
-        color: #15803d;
-    }
-    
-    .stError {
-        background-color: #fef2f2;
-        border: 1px solid #ef4444;
-        color: #dc2626;
-    }
-    
-    .stWarning {
-        background-color: #fffbeb;
-        border: 1px solid #f59e0b;
-        color: #d97706;
-    }
-    
-    .stInfo {
-        background-color: #eff6ff;
-        border: 1px solid #3b82f6;
-        color: #1d4ed8;
+    .download-button:hover {
+        background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(34, 197, 94, 0.3);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -523,6 +483,42 @@ def initialize_session_state():
         st.session_state.current_job = None
     if 'localStorage_initialized' not in st.session_state:
         st.session_state.localStorage_initialized = False
+    if 'download_data' not in st.session_state:
+        st.session_state.download_data = {}
+
+# ファイルダウンロード用の安全な関数
+def create_download_data(data, filename, mime_type):
+    """ダウンロード用データを安全に作成してセッション状態に保存"""
+    try:
+        # データをBase64エンコードして保存
+        if isinstance(data, bytes):
+            encoded_data = base64.b64encode(data).decode()
+        else:
+            encoded_data = base64.b64encode(data.encode()).decode()
+        
+        download_key = f"{filename}_{int(time.time())}"
+        st.session_state.download_data[download_key] = {
+            'data': encoded_data,
+            'filename': filename,
+            'mime_type': mime_type,
+            'created_at': datetime.now()
+        }
+        return download_key
+    except Exception as e:
+        st.error(f"ダウンロードデータの作成に失敗しました: {str(e)}")
+        return None
+
+def get_download_data(download_key):
+    """セッション状態からダウンロードデータを取得"""
+    try:
+        if download_key in st.session_state.download_data:
+            data_info = st.session_state.download_data[download_key]
+            decoded_data = base64.b64decode(data_info['data'])
+            return decoded_data, data_info['filename'], data_info['mime_type']
+        return None, None, None
+    except Exception as e:
+        st.error(f"ダウンロードデータの取得に失敗しました: {str(e)}")
+        return None, None, None
 
 class AITeleapoManager:
     def __init__(self):
@@ -920,7 +916,7 @@ def main():
         <h4><span class="small-icon">📊</span> システム情報</h4>
         <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
         <p><strong>保存場所:</strong> {manager.base_dir.name}/</p>
-      
+        <p><strong>バージョン:</strong> 2.4.0 (ダウンロード修正版)</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -1003,15 +999,32 @@ def main():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # ダウンロードボタン
-                            with open(result['upload_path'], 'rb') as f:
+                            # ファイルを読み込んでダウンロード用データを作成
+                            try:
+                                with open(result['upload_path'], 'rb') as f:
+                                    file_data = f.read()
+                                
+                                final_filename = f"{output_name}_{job_id}.csv"
+                                
+                                # ダウンロードボタン（改良版）
+                                st.markdown("""
+                                <div class="download-section">
+                                    <h4>📥 ファイルダウンロード</h4>
+                                    <p>AIテレアポシステムにアップロードするCSVファイルをダウンロードしてください。</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
                                 st.download_button(
                                     label="📥 AIテレアポ用CSVをダウンロード",
-                                    data=f.read(),
-                                    file_name=f"{output_name}_{job_id}.csv",
+                                    data=file_data,
+                                    file_name=final_filename,
                                     mime="text/csv",
-                                    help="日本語対応エンコーディングで保存されています"
+                                    help="日本語対応エンコーディングで保存されています",
+                                    key=f"download_{job_id}"
                                 )
+                                
+                            except Exception as e:
+                                st.error(f"❌ ファイル読み込みエラー: {str(e)}")
                 
                 except Exception as e:
                     st.error(f"❌ ファイル処理エラー: {str(e)}")
@@ -1157,30 +1170,49 @@ def main():
                             )
                             
                             if st.button("💾 結果を保存", type="primary"):
-                                timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-                                final_filename = f"{output_filename}_{timestamp}.xlsx"
-                                
-                                # メモリ上でExcelファイルを作成
-                                from io import BytesIO
-                                buffer = BytesIO()
-                                merged_df.to_excel(buffer, index=False, engine='openpyxl')
-                                buffer.seek(0)
-                                
-                                # ダウンロードボタン
-                                st.download_button(
-                                    label="📥 分析結果をダウンロード",
-                                    data=buffer.getvalue(),
-                                    file_name=final_filename,
-                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                                )
-                                
-                                st.markdown(f"""
-                                <div class="success-box">
-                                    <h4>✅ 分析完了！</h4>
-                                    <p><strong>ファイル:</strong> {final_filename}</p>
-                                    <p>FileMakerに取り込み可能な形式で保存されました。</p>
-                                </div>
-                                """, unsafe_allow_html=True)
+                                try:
+                                    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+                                    final_filename = f"{output_filename}_{timestamp}.xlsx"
+                                    
+                                    # メモリ上でExcelファイルを作成（改良版）
+                                    buffer = BytesIO()
+                                    
+                                    # ExcelWriterを使用してより確実にファイルを作成
+                                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                                        merged_df.to_excel(writer, index=False, sheet_name='分析結果')
+                                    
+                                    # バッファの位置を先頭に戻す
+                                    buffer.seek(0)
+                                    excel_data = buffer.getvalue()
+                                    
+                                    # ダウンロードセクション
+                                    st.markdown("""
+                                    <div class="download-section">
+                                        <h4>📥 分析結果ダウンロード</h4>
+                                        <p>FileMakerに取り込み可能な形式で保存されました。</p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # ダウンロードボタン（改良版）
+                                    st.download_button(
+                                        label="📥 分析結果をダウンロード",
+                                        data=excel_data,
+                                        file_name=final_filename,
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        key=f"download_result_{selected_job_id}_{timestamp}"
+                                    )
+                                    
+                                    st.markdown(f"""
+                                    <div class="success-box">
+                                        <h4>✅ 分析完了！</h4>
+                                        <p><strong>ファイル:</strong> {final_filename}</p>
+                                        <p><strong>データ件数:</strong> {len(merged_df):,} 件</p>
+                                        <p>FileMakerに取り込み可能な形式で保存されました。</p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                except Exception as e:
+                                    st.error(f"❌ ファイル生成エラー: {str(e)}")
                             
                             # データプレビュー
                             with st.expander("📋 分析済みデータプレビュー"):
@@ -1253,7 +1285,8 @@ def main():
             <p><strong>ジョブ保存場所:</strong> {manager.base_dir.absolute()}</p>
             <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
             <p><strong>localStorage対応:</strong> ✅ 有効</p>
-            
+            <p><strong>バージョン:</strong> 2.4.0 (ダウンロード修正版)</p>
+            <p><strong>新機能:</strong> 確実なファイルダウンロード、エラーハンドリング強化</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -1273,4 +1306,3 @@ def main():
         """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main()
