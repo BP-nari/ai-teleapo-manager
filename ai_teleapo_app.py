@@ -609,57 +609,6 @@ def main():
         **バージョン:** 2.0.0 (社名ベースマージ対応)
         """)
 
-# === localStorage関連の追加関数 ===
-def save_jobs_to_browser():
-    jobs_json = json.dumps(st.session_state.jobs, default=str, ensure_ascii=False)
-    html(f"""<script>
-    localStorage.setItem("teleapo_jobs", JSON.stringify({jobs_json}));
-    console.log("✅ teleapo_jobs saved to localStorage");
-    </script>""", height=0)
-
-def load_jobs_from_browser():
-    html("""<script>
-    const data = localStorage.getItem("teleapo_jobs");
-    if (data) {
-        const jobs = JSON.parse(data);
-        window.parent.postMessage({type: 'load_jobs', jobs: jobs}, '*');
-        console.log("📥 teleapo_jobs loaded from localStorage");
-    }
-    </script>""", height=0)
-
-def restore_jobs():
-    st.markdown("""<script>
-    window.addEventListener("message", (event) => {
-        if (event.data.type === "load_jobs") {
-            const jobs = event.data.jobs;
-            const textarea = window.parent.document.querySelector("textarea[data-testid='stTextArea']");
-            if (textarea) {
-                textarea.value = JSON.stringify(jobs);
-                textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            }
-        }
-    });
-    </script>""", unsafe_allow_html=True)
-
-# === メイン関数 ===
-def main():
-    st.markdown('<h1 class="main-header">📞 AIテレアポ管理システム</h1>', unsafe_allow_html=True)
-
-    manager = AITeleapoManager()
-    load_jobs_from_browser()
-    restore_jobs()
-    temp_input = st.text_area("（ブラウザ保存から復元用）非表示エリア", key="job_restore_area", label_visibility="collapsed", height=1)
-    if temp_input.strip():
-        try:
-            restored_jobs = json.loads(temp_input)
-            if isinstance(restored_jobs, list) and len(st.session_state.jobs) == 0:
-                st.session_state.jobs = restored_jobs
-                st.toast("📥 ブラウザ保存のジョブ履歴を復元しました！", icon="🔄")
-        except Exception:
-            pass
-
-    st.sidebar.title("🎛️ 操作メニュー")
-    st.sidebar.write("（この部分に既存メニューを統合してください）")
 
 
 
