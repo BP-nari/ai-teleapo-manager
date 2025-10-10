@@ -1134,50 +1134,49 @@ def main():
                                     buffer.seek(0)
                                     excel_data = buffer.getvalue()
                                     
-                                    # ダウンロードキャッシュに保存
-                                    file_id = f"result_{selected_job_id}_{timestamp}"
-                                    history_manager.save_download_file(file_id, excel_data, final_filename)
-                                    
-                                    # セッション状態にファイルIDを保存
-                                    st.session_state[f'download_file_id_{selected_job_id}'] = file_id
+                                    # セッション状態に直接保存
+                                    st.session_state[f'download_data_{selected_job_id}'] = {
+                                        'data': excel_data,
+                                        'filename': final_filename,
+                                        'timestamp': timestamp,
+                                        'row_count': len(merged_df)
+                                    }
                                     
                                     st.success("✅ 結果が保存されました！下のダウンロードボタンからファイルを取得してください。")
                                     
                                 except Exception as e:
                                     st.error(f"❌ ファイル生成エラー: {str(e)}")
                             
-                            # ダウンロードボタンを常時表示（ファイルIDがある場合）
-                            download_file_id_key = f'download_file_id_{selected_job_id}'
-                            if download_file_id_key in st.session_state:
-                                file_id = st.session_state[download_file_id_key]
-                                cached_file = history_manager.get_download_file(file_id)
+                            # ダウンロードボタンを常時表示（データがある場合）
+                            download_data_key = f'download_data_{selected_job_id}'
+                            if download_data_key in st.session_state:
+                                download_info = st.session_state[download_data_key]
                                 
-                                if cached_file:
-                                    st.markdown(f"""
-                                    <div class="success-box">
-                                        <h4>✅ 分析完了！</h4>
-                                        <p><strong>ファイル:</strong> {cached_file['filename']}</p>
-                                        <p><strong>データ件数:</strong> {len(merged_df):,} 件</p>
-                                        <p>FileMakerに取り込み可能な形式で保存されました。</p>
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                                    
-                                    # ダウンロードセクション
-                                    st.markdown("""
-                                    <div class="download-section">
-                                        <h4>📥 分析結果ダウンロード</h4>
-                                        <p>FileMakerに取り込み可能な形式で保存されました。</p>
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                                    
-                                    # ダウンロードボタン
-                                    st.download_button(
-                                        label="📊 分析結果をダウンロード",
-                                        data=cached_file['data'],
-                                        file_name=cached_file['filename'],
-                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                        key=f"download_result_{file_id}"
-                                    )
+                                st.markdown(f"""
+                                <div class="success-box">
+                                    <h4>✅ 分析完了！</h4>
+                                    <p><strong>ファイル:</strong> {download_info['filename']}</p>
+                                    <p><strong>データ件数:</strong> {download_info['row_count']:,} 件</p>
+                                    <p>FileMakerに取り込み可能な形式で保存されました。</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                # ダウンロードセクション
+                                st.markdown("""
+                                <div class="download-section">
+                                    <h4>📥 分析結果ダウンロード</h4>
+                                    <p>FileMakerに取り込み可能な形式で保存されました。</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                # ダウンロードボタン
+                                st.download_button(
+                                    label="📊 分析結果をダウンロード",
+                                    data=download_info['data'],
+                                    file_name=download_info['filename'],
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    key=f"download_result_{selected_job_id}_{download_info['timestamp']}"
+                                )
                             
                             # データプレビュー
                             with st.expander("📋 分析済みデータプレビュー"):
