@@ -1122,30 +1122,46 @@ def main():
                                 help="FileMakerに取り込むためのExcelファイル名"
                             )
                             
-                            if st.button("💾 結果を保存", type="primary"):
+                            if st.button("💾 結果を保存", type="primary", key=f"save_result_{selected_job_id}"):
                                 try:
+                                    st.info("📊 Excelファイルを生成中...")
+                                    
                                     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
                                     final_filename = f"{output_filename}_{timestamp}.xlsx"
+                                    
+                                    # デバッグ情報
+                                    st.write(f"デバッグ: merged_df の行数 = {len(merged_df)}")
+                                    st.write(f"デバッグ: ファイル名 = {final_filename}")
                                     
                                     # メモリ上でExcelファイルを作成
                                     buffer = BytesIO()
                                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                                         merged_df.to_excel(writer, index=False, sheet_name='分析結果')
+                                    
                                     buffer.seek(0)
                                     excel_data = buffer.getvalue()
                                     
+                                    st.write(f"デバッグ: Excelデータサイズ = {len(excel_data)} bytes")
+                                    
                                     # セッション状態に直接保存
-                                    st.session_state[f'download_data_{selected_job_id}'] = {
+                                    download_key = f'download_data_{selected_job_id}'
+                                    st.session_state[download_key] = {
                                         'data': excel_data,
                                         'filename': final_filename,
                                         'timestamp': timestamp,
                                         'row_count': len(merged_df)
                                     }
                                     
+                                    st.write(f"デバッグ: セッション状態に保存完了 - キー: {download_key}")
+                                    
                                     st.success("✅ 結果が保存されました！下のダウンロードボタンからファイルを取得してください。")
+                                    st.rerun()  # ページを再実行してダウンロードボタンを表示
                                     
                                 except Exception as e:
                                     st.error(f"❌ ファイル生成エラー: {str(e)}")
+                                    st.error(f"❌ エラー詳細: {type(e).__name__}")
+                                    import traceback
+                                    st.error(f"❌ スタックトレース: {traceback.format_exc()}")
                             
                             # ダウンロードボタンを常時表示（データがある場合）
                             download_data_key = f'download_data_{selected_job_id}'
