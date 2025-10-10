@@ -1055,98 +1055,100 @@ def main():
                             # 統計を計算
                             stats = manager.calculate_statistics(analyzed_df)
                             
-                            st.subheader("📊 分析結果")
-                            
-                            # 改良されたメトリクス表示
-                            display_metrics(stats)
-                            
-                            # 詳細統計
-                            st.subheader("📈 詳細統計")
-                            col_a, col_b, col_c = st.columns(3)
-                            
-                            with col_a:
-                                st.markdown(f"""
-                                <div class="metric-card">
-                                    <div class="metric-value">{stats['total_time']}</div>
-                                    <div class="metric-label">
-                                        <span class="small-icon">⏱️</span> 総通話時間
-                                    </div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                            with col_b:
-                                st.markdown(f"""
-                                <div class="metric-card">
-                                    <div class="metric-value">{stats['invalid_numbers']}</div>
-                                    <div class="metric-label">
-                                        <span class="small-icon">❌</span> 無効番号
-                                    </div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                            with col_c:
-                                st.markdown(f"""
-                                <div class="metric-card">
-                                    <div class="metric-value">{stats['error_calls']}</div>
-                                    <div class="metric-label">
-                                        <span class="small-icon">⚠️</span> エラー件数
-                                    </div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                            
-                            # 結果分布
-                            st.subheader("📊 架電結果分布")
-                            result_df = pd.DataFrame(list(stats['result_counts'].items()), 
-                                                   columns=['結果', '件数'])
-                            st.dataframe(result_df, use_container_width=True)
-                            
-                            # 元データとマージ（社名ベース）
+# 'elif menu == "📥 結果分析":' ブロック内の 'if st.button("🔍 結果を分析", type="primary"):' 以降を修正
+
+                    if st.button("🔍 結果を分析", type="primary"):
+                        with st.spinner("結果を分析中..."):
+                            # ... (分析ロジックは変更なし) ...
+                            analyzed_df = manager.analyze_call_results(df)
+                            stats = manager.calculate_statistics(analyzed_df)
                             merged_df = manager.merge_with_original(analyzed_df, selected_job_id)
-                            
-                            # マージ結果の確認
-                            st.subheader("🔗 マージ結果")
-                            matched_count = merged_df['fm_id'].notna().sum()
-                            match_rate = (matched_count / len(merged_df) * 100) if len(merged_df) > 0 else 0
-                            
+
+                            # 分析結果とマージ済みデータをセッション状態に保存
+                            st.session_state[f'analyzed_data_{selected_job_id}'] = {
+                                'stats': stats,
+                                'merged_df': merged_df
+                            }
+                            st.session_state[f'analysis_complete_{selected_job_id}'] = True
+
+                # 分析が完了している場合に結果を表示
+                if st.session_state.get(f'analysis_complete_{selected_job_id}', False):
+                    
+                    # セッションから分析済みデータを取得
+                    analysis_data = st.session_state[f'analyzed_data_{selected_job_id}']
+                    stats = analysis_data['stats']
+                    merged_df = analysis_data['merged_df']
+
+                    with st.spinner("分析結果を表示中..."):
+                        st.subheader("📊 分析結果")
+                        display_metrics(stats)
+                        
+                        st.subheader("📈 詳細統計")
+                        col_a, col_b, col_c = st.columns(3)
+                        with col_a:
                             st.markdown(f"""
-                            <div class="info-box">
-                                <h4><span class="small-icon">📊</span> マッチング結果</h4>
-                                <p><strong>マッチした件数:</strong> {matched_count:,} / {len(merged_df):,} 件</p>
-                                <p><strong>マッチ率:</strong> {match_rate:.1f}%</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            
-                            # 出力ファイル名の指定
-                            st.subheader("💾 結果保存")
-                            output_filename = st.text_input(
-                                "出力ファイル名を入力してください",
-                                value=f"結果_{selected_job_id}",
-                                help="FileMakerに取り込むためのExcelファイル名"
-                            )
-                            
-                            # 結果を保存してダウンロードボタンを表示
-                            col_save, col_download = st.columns([1, 1])
-                            
-                            with col_save:
-                                if st.button("💾 結果を保存", type="primary", key=f"save_result_{selected_job_id}"):
-                                    try:
-                                        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-                                        final_filename = f"{output_filename}_{timestamp}.xlsx"
-                                        
-                                        # メモリ上でExcelファイルを作成
-                                        buffer = BytesIO()
-                                        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                                            merged_df.to_excel(writer, index=False, sheet_name='分析結果')
-                                        buffer.seek(0)
-                                        excel_data = buffer.getvalue()
-                                        
-                                        # セッション状態に直接保存
-                                        st.session_state[f'excel_data_{selected_job_id}'] = excel_data
-                                        st.session_state[f'excel_filename_{selected_job_id}'] = final_filename
-                                        st.session_state[f'excel_ready_{selected_job_id}'] = True
-                                        
-                                        st.success("✅ 保存完了！")
-                                        
-                                    except Exception as e:
-                                        st.error(f"❌ エラー: {str(e)}")
+                            <div class="metric-card">
+                                <div class="metric-value">{stats['total_time']}</div>
+                                <div class="metric-label"><span class="small-icon">⏱️</span> 総通話時間</div>
+                            </div>""", unsafe_allow_html=True)
+                        with col_b:
+                            st.markdown(f"""
+                            <div class="metric-card">
+                                <div class="metric-value">{stats['invalid_numbers']}</div>
+                                <div class="metric-label"><span class="small-icon">❌</span> 無効番号</div>
+                            </div>""", unsafe_allow_html=True)
+                        with col_c:
+                            st.markdown(f"""
+                            <div class="metric-card">
+                                <div class="metric-value">{stats['error_calls']}</div>
+                                <div class="metric-label"><span class="small-icon">⚠️</span> エラー件数</div>
+                            </div>""", unsafe_allow_html=True)
+                        
+                        st.subheader("📊 架電結果分布")
+                        result_df = pd.DataFrame(list(stats['result_counts'].items()), columns=['結果', '件数'])
+                        st.dataframe(result_df, use_container_width=True)
+                        
+                        st.subheader("🔗 マージ結果")
+                        matched_count = merged_df['fm_id'].notna().sum()
+                        match_rate = (matched_count / len(merged_df) * 100) if len(merged_df) > 0 else 0
+                        st.markdown(f"""
+                        <div class="info-box">
+                            <h4><span class="small-icon">📊</span> マッチング結果</h4>
+                            <p><strong>マッチした件数:</strong> {matched_count:,} / {len(merged_df):,} 件</p>
+                            <p><strong>マッチ率:</strong> {match_rate:.1f}%</p>
+                        </div>""", unsafe_allow_html=True)
+
+                        # --- ダウンロード処理の修正 ---
+                        st.subheader("💾 結果ダウンロード")
+                        output_filename_base = st.text_input(
+                            "出力ファイル名（ベース）を入力してください",
+                            value=f"結果_{selected_job_id}",
+                            help="FileMakerに取り込むためのExcelファイル名"
+                        )
+
+                        # メモリ上でExcelファイルを作成
+                        buffer = BytesIO()
+                        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                            merged_df.to_excel(writer, index=False, sheet_name='分析結果')
+                        excel_data = buffer.getvalue()
+
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+                        final_filename = f"{output_filename_base}_{timestamp}.xlsx"
+
+                        st.download_button(
+                            label="📊 結果をExcelでダウンロード",
+                            data=excel_data,
+                            file_name=final_filename,
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"download_excel_{selected_job_id}",
+                            type="primary",
+                            help="クリックすると分析結果がExcelファイルとしてダウンロードされます。"
+                        )
+                        
+                        with st.expander("📋 分析済みデータプレビュー"):
+                            st.dataframe(merged_df.head(20), use_container_width=True)
+
+
                             
                             with col_download:
                                 # ダウンロードボタンを常に表示（データがある場合）
