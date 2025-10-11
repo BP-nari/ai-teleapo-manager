@@ -978,10 +978,10 @@ def main():
             <div class="sidebar-section">
                 <h4><span class="small-icon">📋</span> 作成の流れ</h4>
                 <ol>
-                    <li><strong><span class="small-icon">📁</span> ファイル選択</strong><br>FileMakerから出力したExcelファイルを選択</li>
-                    <li><strong><span class="small-icon">📝</span> 設定入力</strong><br>出力ファイル名とロボット台数を設定</li>
-                    <li><strong><span class="small-icon">🚀</span> ジョブ作成</strong><br>AIテレアポ用のCSVファイルを自動生成</li>
-                    <li><strong><span class="small-icon">📤</span> ファイル取得</strong><br>生成されたCSVをダウンロード</li>
+                    <li><strong><span class="small-icon">📤</span> 新規ジョブ作成</strong><br>FileMakerから出力したExcelファイルを選択</li>
+                    <li><strong><span class="small-icon">📤</span> 結果分析</strong><br>AIテレアポ結果の分析&ファイルメーカー返送用データ作成</li>
+                    <li><strong><span class="small-icon">📊</span> ジョブ履歴</strong><br>保管されているファイルメーカーデータの管理</li>
+                    <li><strong><span class="small-icon">⚙️</span> 設定</strong><br>ジョブの削除&再読み込み</li>
                 </ol>
             </div>
             """, unsafe_allow_html=True)
