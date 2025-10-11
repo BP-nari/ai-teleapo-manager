@@ -791,9 +791,9 @@ def display_job_card(job):
             </div>
             <div class="job-info-item">
                 <div class="job-info-label">
-                    <span class="small-icon">🤖</span> ロボット台数
+                    <span class="small-icon">🤖</span> レーン
                 </div>
-                <div class="job-info-value">{job['robot_count']} 台</div>
+                <div class="job-info-value">{job['robot_count']} 番</div>
             </div>
             <div class="job-info-item">
                 <div class="job-info-label">
