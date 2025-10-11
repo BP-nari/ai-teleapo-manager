@@ -498,7 +498,7 @@ class AITeleapoManager:
         """テキストを正規化"""
         if pd.isna(text):
             return ""
-        return str(text).strip().lower()
+        return str(text).strip()
     
     def create_row_key(self, company, phone):
         """行指紋を作成（社名ベース）"""
@@ -871,7 +871,7 @@ def main():
         <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
         <p><strong>保存場所:</strong> {manager.base_dir.name}/</p>
         <p><strong>履歴ファイル:</strong> job_history.json</p>
-        <p><strong>バージョン:</strong> 6.0.0 (完全修正版)</p>
+        <p><strong>バージョン:</strong> 7.0.0 (修正版)</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -949,35 +949,19 @@ def main():
                                 <h4>✅ ジョブ作成完了</h4>
                                 <p><strong>ジョブID:</strong> {job_id}</p>
                                 <p><strong>処理件数:</strong> {result['total_rows']:,} 件</p>
-                                <p><strong>ロボット台数:</strong> {robot_count} 台</p>
-                                <p><span class="small-icon">💾</span> ジョブ履歴がファイルに保存されました</p>
+                                <p><strong>アップロード用ファイル:</strong> {result['upload_path']}</p>
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # ファイルを読み込んでダウンロードボタンを作成
-                            try:
-                                with open(result['upload_path'], 'rb') as f:
-                                    file_data = f.read()
-                                
-                                final_filename = f"{output_name}_{job_id}.csv"
-                                
-                                st.markdown("""
-                                <div class="download-section">
-                                    <h4>📥 ファイルダウンロード</h4>
-                                    <p>AIテレアポシステムにアップロードするCSVファイルをダウンロードしてください。</p>
-                                </div>
-                                """, unsafe_allow_html=True)
-                                
+                            # ダウンロードボタン
+                            with open(result['upload_path'], 'rb') as f:
                                 st.download_button(
-                                    label="📥 AIテレアポ用CSVをダウンロード",
-                                    data=file_data,
-                                    file_name=final_filename,
+                                    label="📤 AIテレアポ用CSVをダウンロード",
+                                    data=f.read(),
+                                    file_name=f"{output_name}.csv",
                                     mime="text/csv",
-                                    help="日本語対応エンコーディングで保存されています",
-                                    key=f"download_{job_id}"
+                                    type="primary"
                                 )
-                            except Exception as e:
-                                st.error(f"❌ ファイル読み込みエラー: {str(e)}")
                 
                 except Exception as e:
                     st.error(f"❌ ファイル処理エラー: {str(e)}")
@@ -985,12 +969,12 @@ def main():
         with col2:
             st.markdown("""
             <div class="sidebar-section">
-                <h4><span class="small-icon">📋</span> 処理の流れ</h4>
+                <h4><span class="small-icon">📋</span> 作成の流れ</h4>
                 <ol>
-                    <li><strong><span class="small-icon">📁</span> ファイルアップロード</strong><br>FileMakerのExcelファイルを選択</li>
-                    <li><strong><span class="small-icon">⚙️</span> 設定</strong><br>出力ファイル名とロボット台数を指定</li>
-                    <li><strong><span class="small-icon">🚀</span> ジョブ作成</strong><br>データを変換・保存し、行指紋を生成</li>
-                    <li><strong><span class="small-icon">📥</span> ダウンロード</strong><br>AIテレアポ用CSVを取得してシステムにアップロード</li>
+                    <li><strong><span class="small-icon">📁</span> ファイル選択</strong><br>FileMakerから出力したExcelファイルを選択</li>
+                    <li><strong><span class="small-icon">📝</span> 設定入力</strong><br>出力ファイル名とロボット台数を設定</li>
+                    <li><strong><span class="small-icon">🚀</span> ジョブ作成</strong><br>AIテレアポ用のCSVファイルを自動生成</li>
+                    <li><strong><span class="small-icon">📤</span> ファイル取得</strong><br>生成されたCSVをダウンロード</li>
                 </ol>
             </div>
             """, unsafe_allow_html=True)
@@ -1122,59 +1106,37 @@ def main():
                                 help="FileMakerに取り込むためのExcelファイル名"
                             )
                             
-                            # 結果を保存してダウンロードボタンを表示
-                            col_save, col_download = st.columns([1, 1])
+                            # 修正版：結果を保存ボタンをクリックしたら即座に自動ダウンロード
+                            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+                            final_filename = f"{output_filename}_{timestamp}.xlsx"
                             
-                            with col_save:
-                                if st.button("💾 結果を保存", type="primary", key=f"save_result_{selected_job_id}"):
-                                    try:
-                                        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-                                        final_filename = f"{output_filename}_{timestamp}.xlsx"
-                                        
-                                        # メモリ上でExcelファイルを作成
-                                        buffer = BytesIO()
-                                        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                                            merged_df.to_excel(writer, index=False, sheet_name='分析結果')
-                                        buffer.seek(0)
-                                        excel_data = buffer.getvalue()
-                                        
-                                        # セッション状態に直接保存
-                                        st.session_state[f'excel_data_{selected_job_id}'] = excel_data
-                                        st.session_state[f'excel_filename_{selected_job_id}'] = final_filename
-                                        st.session_state[f'excel_ready_{selected_job_id}'] = True
-                                        
-                                        st.success("✅ 保存完了！")
-                                        
-                                    except Exception as e:
-                                        st.error(f"❌ エラー: {str(e)}")
+                            # メモリ上でExcelファイルを作成
+                            buffer = BytesIO()
+                            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                                merged_df.to_excel(writer, index=False, sheet_name='分析結果')
+                            buffer.seek(0)
+                            excel_data = buffer.getvalue()
                             
-                            with col_download:
-                                # ダウンロードボタンを常に表示（データがある場合）
-                                if st.session_state.get(f'excel_ready_{selected_job_id}', False):
-                                    excel_data = st.session_state[f'excel_data_{selected_job_id}']
-                                    filename = st.session_state[f'excel_filename_{selected_job_id}']
-                                    
-                                    st.download_button(
-                                        label="📊 結果をダウンロード",
-                                        data=excel_data,
-                                        file_name=filename,
-                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                        key=f"download_{selected_job_id}",
-                                        type="primary"
-                                    )
-                                else:
-                                    st.info("まず「結果を保存」をクリックしてください")
+                            # 自動ダウンロード機能付きボタン
+                            st.download_button(
+                                label="💾 結果を保存",
+                                data=excel_data,
+                                file_name=final_filename,
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key=f"auto_download_{selected_job_id}_{timestamp}",
+                                type="primary",
+                                help="クリックすると即座にExcelファイルがダウンロードされます"
+                            )
                             
-                            # 保存済みの場合は詳細情報を表示
-                            if st.session_state.get(f'excel_ready_{selected_job_id}', False):
-                                st.markdown(f"""
-                                <div class="success-box">
-                                    <h4>✅ ダウンロード準備完了！</h4>
-                                    <p><strong>ファイル:</strong> {st.session_state[f'excel_filename_{selected_job_id}']}</p>
-                                    <p><strong>データ件数:</strong> {len(merged_df):,} 件</p>
-                                    <p>上の「📊 結果をダウンロード」ボタンからファイルを取得してください。</p>
-                                </div>
-                                """, unsafe_allow_html=True)
+                            # 詳細情報を表示
+                            st.markdown(f"""
+                            <div class="success-box">
+                                <h4>✅ ダウンロード準備完了！</h4>
+                                <p><strong>ファイル:</strong> {final_filename}</p>
+                                <p><strong>データ件数:</strong> {len(merged_df):,} 件</p>
+                                <p>上の「💾 結果を保存」ボタンをクリックすると即座にダウンロードが開始されます。</p>
+                            </div>
+                            """, unsafe_allow_html=True)
                             
                             # データプレビュー
                             with st.expander("📋 分析済みデータプレビュー"):
@@ -1192,7 +1154,7 @@ def main():
                     <li><strong><span class="small-icon">📊</span> 結果アップロード</strong><br>AIテレアポの結果CSVを選択</li>
                     <li><strong><span class="small-icon">🔍</span> 自動分析</strong><br>通話結果を自動判定し統計情報を計算</li>
                     <li><strong><span class="small-icon">🔗</span> データマージ</strong><br>社名ベースで元データと結合</li>
-                    <li><strong><span class="small-icon">💾</span> 結果保存</strong><br>Excelファイルとして出力</li>
+                    <li><strong><span class="small-icon">💾</span> 結果保存</strong><br>Excelファイルとして即座にダウンロード</li>
                 </ol>
             </div>
             """, unsafe_allow_html=True)
@@ -1252,8 +1214,8 @@ def main():
             <p><strong>履歴ファイル存在:</strong> {'✅ あり' if history_file_exists else '❌ なし'}</p>
             <p><strong>キャッシュファイル数:</strong> {cache_files} 個</p>
             <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
-            <p><strong>バージョン:</strong> 6.0.0 (完全修正版)</p>
-            <p><strong>新機能:</strong> ファイルベース履歴管理、確実なダウンロード機能</p>
+            <p><strong>バージョン:</strong> 7.0.0 (修正版)</p>
+            <p><strong>修正内容:</strong> 「結果を保存」ボタンクリック時に即座にダウンロード可能</p>
         </div>
         """, unsafe_allow_html=True)
 
