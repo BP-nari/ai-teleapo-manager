@@ -871,7 +871,7 @@ def main():
         <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
         <p><strong>保存場所:</strong> {manager.base_dir.name}/</p>
         <p><strong>履歴ファイル:</strong> job_history.json</p>
-        <p><strong>バージョン:</strong> 7.0.0 (修正版)</p>
+        <p><strong>バージョン:</strong> 8.0.0 (5レーン対応版)</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -908,12 +908,19 @@ def main():
                     with st.expander("📋 データプレビュー"):
                         st.dataframe(df.head(10), use_container_width=True)
                     
-                    # 出力ファイル名の指定
+                    # 出力ファイル名の指定（自動生成）
                     st.subheader("📝 出力設定")
-                    output_name = st.text_input(
-                        "出力ファイル名を入力してください",
-                        value="AIテレアポ用リスト",
-                        help="AIテレアポシステムにアップロードするファイルの名前"
+                    # 元ファイル名から拡張子を除去
+                    base_filename = uploaded_file.name.rsplit('.', 1)[0]
+                    # 日付を追加
+                    date_str = datetime.now().strftime("%Y%m%d")
+                    # 自動生成されたファイル名を表示
+                    output_name = f"{base_filename}_{date_str}_AIテレアポリスト"
+                    st.text_input(
+                        "出力ファイル名",
+                        value=output_name,
+                        disabled=True,
+                        help="元ファイル名+日付+AIテレアポリストで自動生成されます"
                     )
                     
                     # ロボット台数選択
@@ -1019,13 +1026,7 @@ def main():
                         except UnicodeDecodeError:
                             df = pd.read_csv(results_file, encoding='cp932')
                     
-                    st.markdown(f"""
-                    <div class="success-box">
-                        <h4>✅ 結果ファイル読み込み完了</h4>
-                        <p><strong>ファイル名:</strong> {results_file.name}</p>
-                        <p><strong>データ件数:</strong> {len(df):,} 件</p>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.success(f"✅ ファイル読み込み完了: {results_file.name} ({len(df):,} 件)")
                     
                     # データプレビュー
                     with st.expander("📋 結果データプレビュー"):
@@ -1098,17 +1099,26 @@ def main():
                             </div>
                             """, unsafe_allow_html=True)
                             
-                            # 出力ファイル名の指定
+                            # 出力ファイル名の指定（自動生成）
                             st.subheader("💾 結果保存")
-                            output_filename = st.text_input(
-                                "出力ファイル名を入力してください",
-                                value=f"結果_{selected_job_id}",
-                                help="FileMakerに取り込むためのExcelファイル名"
+                            # 選択されたジョブの元ファイル名を取得
+                            selected_job = next((job for job in st.session_state.jobs if job['job_id'] == selected_job_id), None)
+                            if selected_job:
+                                base_filename = selected_job['filename'].rsplit('.', 1)[0]
+                                date_str = datetime.now().strftime("%Y%m%d")
+                                output_filename = f"{base_filename}_{date_str}_結果"
+                            else:
+                                output_filename = f"結果_{selected_job_id}"
+                            
+                            st.text_input(
+                                "出力ファイル名",
+                                value=output_filename,
+                                disabled=True,
+                                help="元ファイル名+日付+結果で自動生成されます"
                             )
                             
                             # 修正版：結果を保存ボタンをクリックしたら即座に自動ダウンロード
-                            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-                            final_filename = f"{output_filename}_{timestamp}.xlsx"
+                            final_filename = f"{output_filename}.xlsx"
                             
                             # メモリ上でExcelファイルを作成
                             buffer = BytesIO()
@@ -1123,7 +1133,7 @@ def main():
                                 data=excel_data,
                                 file_name=final_filename,
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                key=f"auto_download_{selected_job_id}_{timestamp}",
+                                key=f"auto_download_{selected_job_id}",
                                 type="primary",
                                 help="クリックすると即座にExcelファイルがダウンロードされます"
                             )
@@ -1145,19 +1155,7 @@ def main():
                 except Exception as e:
                     st.error(f"❌ 結果分析エラー: {str(e)}")
         
-        with col2:
-            st.markdown("""
-            <div class="sidebar-section">
-                <h4><span class="small-icon">📋</span> 分析の流れ</h4>
-                <ol>
-                    <li><strong><span class="small-icon">🎯</span> ジョブ選択</strong><br>分析対象のジョブを選択</li>
-                    <li><strong><span class="small-icon">📊</span> 結果アップロード</strong><br>AIテレアポの結果CSVを選択</li>
-                    <li><strong><span class="small-icon">🔍</span> 自動分析</strong><br>通話結果を自動判定し統計情報を計算</li>
-                    <li><strong><span class="small-icon">🔗</span> データマージ</strong><br>社名ベースで元データと結合</li>
-                    <li><strong><span class="small-icon">💾</span> 結果保存</strong><br>Excelファイルとして即座にダウンロード</li>
-                </ol>
-            </div>
-            """, unsafe_allow_html=True)
+
     
     elif menu == "📊 ジョブ履歴":
         st.markdown('<h2 class="section-header"><span class="small-icon">📊</span> ジョブ履歴</h2>', unsafe_allow_html=True)
@@ -1214,8 +1212,7 @@ def main():
             <p><strong>履歴ファイル存在:</strong> {'✅ あり' if history_file_exists else '❌ なし'}</p>
             <p><strong>キャッシュファイル数:</strong> {cache_files} 個</p>
             <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
-            <p><strong>バージョン:</strong> 7.0.0 (修正版)</p>
-            <p><strong>修正内容:</strong> 「結果を保存」ボタンクリック時に即座にダウンロード可能</p>
+            <p><strong>バージョン:</strong> 8.0.0 (5レーン対応版)</p>
         </div>
         """, unsafe_allow_html=True)
 
