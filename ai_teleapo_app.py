@@ -1138,15 +1138,7 @@ def main():
                                 help="クリックすると即座にExcelファイルがダウンロードされます"
                             )
                             
-                            # 詳細情報を表示
-                            st.markdown(f"""
-                            <div class="success-box">
-                                <h4>✅ ダウンロード準備完了！</h4>
-                                <p><strong>ファイル:</strong> {final_filename}</p>
-                                <p><strong>データ件数:</strong> {len(merged_df):,} 件</p>
-                                <p>上の「💾 結果を保存」ボタンをクリックすると即座にダウンロードが開始されます。</p>
-                            </div>
-                            """, unsafe_allow_html=True)
+
                             
                             # データプレビュー
                             with st.expander("📋 分析済みデータプレビュー"):
