@@ -529,7 +529,11 @@ class AITeleapoManager:
         if available_columns:
             upload_df = upload_df[available_columns].copy()
         
-        # 行指紋を作成してrowmapを生成（社名ベース）
+        # 社名を50文字でカット
+        if '社名' in upload_df.columns:
+            upload_df['社名'] = upload_df['社名'].astype(str).str[:50]
+        
+        # 行指紋を作成してrowmapを生成(社名ベース)
         rowmap_data = []
         for idx, row in df.iterrows():
             company = row.get('顧客名', '') if '顧客名' in df.columns else row.get('社名', '')
