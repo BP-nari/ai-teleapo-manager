@@ -684,6 +684,21 @@ class AITeleapoManager:
         # 架電時刻列を保持（存在する場合）
         has_call_time = '架電時刻' in call_results_df.columns
         
+        # 架電時刻を日付と時間に分割
+        if has_call_time:
+            try:
+                # 架電時刻を日時型に変換
+                call_results_df['架電時刻_dt'] = pd.to_datetime(call_results_df['架電時刻'], errors='coerce')
+                # 日付列を作成（YYYY/MM/DD形式）
+                call_results_df['架電日'] = call_results_df['架電時刻_dt'].dt.strftime('%Y/%m/%d')
+                # 時間列を作成（HH:MM:SS形式）
+                call_results_df['架電時間'] = call_results_df['架電時刻_dt'].dt.strftime('%H:%M:%S')
+                # 一時列を削除
+                call_results_df = call_results_df.drop('架電時刻_dt', axis=1)
+            except Exception as e:
+                # エラーが発生した場合は元の架電時刻をそのまま使用
+                pass
+        
         # 社名ベースでマージ
         merged_df = pd.merge(
             call_results_df, 
@@ -706,13 +721,17 @@ class AITeleapoManager:
             axis=1
         )
         
-        # 列の順序を整理（架電時刻を含める）
-        if has_call_time:
+        # 列の順序を整理（架電日・架電時間を含める）
+        if has_call_time and '架電日' in merged_df.columns and '架電時間' in merged_df.columns:
+            column_order = ['fm_id', '社名', '電話番号', '架電日', '架電時間', 'ステータス', '架電結果', '要約', '通話時間', 
+                           '住所統合', '最終トーク判定', '最終有効無効', '最終決済担当', 'row_key']
+        elif has_call_time:
+            # 分割できなかった場合は元の架電時刻を使用
             column_order = ['fm_id', '社名', '電話番号', '架電時刻', 'ステータス', '架電結果', '要約', '通話時間', 
                            '住所統合', '最終トーク判定', '最終有効無効', '最終決済担当', 'row_key']
         else:
             column_order = ['fm_id', '社名', '電話番号', 'ステータス', '架電結果', '要約', '通話時間', 
-                           '住所統合', '最終トーク判定', '最終有効無効', '最終決済担当', 'row_key']
+                           '住所統合', '最終トーク判定', '最終有効無効', '最終決済担弰', 'row_key']
         
         # 存在する列のみを選択
         available_columns = [col for col in column_order if col in merged_df.columns]
