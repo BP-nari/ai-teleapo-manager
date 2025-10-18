@@ -397,8 +397,10 @@ class JobHistoryManager:
             
             with open(self.history_file, 'w', encoding='utf-8') as f:
                 json.dump(serializable_jobs, f, ensure_ascii=False, indent=2)
+            return True
         except Exception as e:
-            st.error(f"ジョブ履歴の保存に失敗しました: {e}")
+            st.error(f"ジョブ履歴保存エラー: {str(e)}")
+            return False
     
     def load_jobs(self):
         """ジョブ履歴をファイルから読み込み"""
@@ -418,18 +420,23 @@ class JobHistoryManager:
                 return jobs
             return []
         except Exception as e:
-            st.error(f"ジョブ履歴の読み込みに失敗しました: {e}")
+            st.error(f"ジョブ履歴読み込みエラー: {str(e)}")
             return []
     
     def clear_jobs(self):
         """ジョブ履歴をクリア"""
-        if self.history_file.exists():
-            self.history_file.unlink()
-    
-    def cache_download(self, job_id, data, filename):
-        """ダウンロードデータをキャッシュ"""
-        cache_file = self.download_cache_dir / f"{job_id}.pkl"
         try:
+            if self.history_file.exists():
+                self.history_file.unlink()
+            return True
+        except Exception as e:
+            st.error(f"ジョブ履歴クリアエラー: {str(e)}")
+            return False
+    
+    def save_download_file(self, file_id, data, filename):
+        """ダウンロード用ファイルをキャッシュに保存"""
+        try:
+            cache_file = self.download_cache_dir / f"{file_id}.pkl"
             cache_data = {
                 'data': data,
                 'filename': filename,
@@ -437,41 +444,43 @@ class JobHistoryManager:
             }
             with open(cache_file, 'wb') as f:
                 pickle.dump(cache_data, f)
+            return True
         except Exception as e:
-            st.error(f"キャッシュの保存に失敗しました: {e}")
+            st.error(f"ダウンロードファイル保存エラー: {str(e)}")
+            return False
     
-    def get_cached_download(self, job_id):
-        """キャッシュされたダウンロードデータを取得"""
-        cache_file = self.download_cache_dir / f"{job_id}.pkl"
+    def get_download_file(self, file_id):
+        """ダウンロード用ファイルをキャッシュから取得"""
         try:
+            cache_file = self.download_cache_dir / f"{file_id}.pkl"
             if cache_file.exists():
                 with open(cache_file, 'rb') as f:
                     cache_data = pickle.load(f)
                 return cache_data
             return None
         except Exception as e:
-            st.error(f"キャッシュの読み込みに失敗しました: {e}")
+            st.error(f"ダウンロードファイル取得エラー: {str(e)}")
             return None
 
-# ジョブマネージャー
-class JobManager:
+# セッション状態の初期化
+def initialize_session_state():
+    """セッション状態を初期化"""
+    if 'jobs' not in st.session_state:
+        # ファイルからジョブ履歴を読み込み
+        history_manager = JobHistoryManager()
+        st.session_state.jobs = history_manager.load_jobs()
+    
+    if 'current_job' not in st.session_state:
+        st.session_state.current_job = None
+    
+    if 'history_manager' not in st.session_state:
+        st.session_state.history_manager = JobHistoryManager()
+
+class AITeleapoManager:
     def __init__(self):
-        self.base_dir = Path("jobs")
+        self.base_dir = Path("teleapo_jobs")
         self.base_dir.mkdir(exist_ok=True)
-    
-    def normalize_text(self, text):
-        """テキストを正規化（空白削除、小文字化）"""
-        if pd.isna(text):
-            return ""
-        return str(text).strip().lower()
-    
-    def create_row_key(self, company, phone):
-        """行を一意に識別するキーを作成（社名+電話番号のハッシュ）"""
-        normalized_company = self.normalize_text(company)
-        normalized_phone = self.normalize_phone(phone)
-        key_str = f"{normalized_company}_{normalized_phone}"
-        return hashlib.md5(key_str.encode()).hexdigest()
-    
+        
     def generate_job_id(self):
         """ジョブIDを生成"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
@@ -485,13 +494,26 @@ class JobManager:
         phone_str = str(phone_str).replace("+81", "0").replace(" ", "").replace("-", "")
         return re.sub(r'\D', '', phone_str)
     
-    def create_job(self, df, filename, output_filename):
-        """新規ジョブを作成"""
-        job_id = self.generate_job_id()
+    def normalize_text(self, text):
+        """テキストを正規化"""
+        if pd.isna(text):
+            return ""
+        return str(text).strip()
+    
+    def create_row_key(self, company, phone):
+        """行指紋を作成（社名ベース）"""
+        # 社名を正規化してキーとして使用
+        normalized_company = self.normalize_text(company)
+        normalized_phone = self.normalize_phone(phone)
+        base = f"{normalized_company}|{normalized_phone}"
+        return hashlib.sha256(base.encode('utf-8')).hexdigest()[:16]
+    
+    def process_filemaker_data(self, df, job_id, output_filename):
+        """FileMakerデータを処理"""
         job_dir = self.base_dir / job_id
         job_dir.mkdir(exist_ok=True)
         
-        # 元データを保存（Excel形式）
+        # 元データを保存
         original_path = job_dir / "fm_export.xlsx"
         df.to_excel(original_path, index=False)
         
@@ -546,7 +568,11 @@ class JobManager:
             'created_at': datetime.now().isoformat(),
             'original_filename': output_filename,
             'total_rows': len(df),
-            'columns': list(df.columns)
+            'files': {
+                'fm_export': 'fm_export.xlsx',
+                'upload': f'{output_filename}.csv',
+                'rowmap': 'rowmap.csv'
+            }
         }
         
         manifest_path = job_dir / "manifest.json"
@@ -556,6 +582,7 @@ class JobManager:
         return {
             'job_id': job_id,
             'upload_path': upload_path,
+            'total_rows': len(df),
             'manifest': manifest
         }
     
@@ -570,9 +597,11 @@ class JobManager:
         
         # 断り・終了系ワード
         ng_words = [
-            "興味を示さず", "必要ない", "断った", "不要", "結構です",
-            "間に合っています", "大丈夫です", "対応が難しい", "会話を終了",
-            "電話を切った", "通話を終了"
+            "断り", "不要", "必要ない", "結構です", "結構",
+            "電話が終了", "電話を切った", "切断", "応答なし", "応答無し",
+            "切られ", "切られる", "切った", "通話が終了", "会話が終了",
+            "進展しない", "通話を終了", "進まなかった", "切りました", "断念",
+            "終了", "成立しなかった", "切", "進展はありま"
         ]
         
         # ステータス分類
@@ -652,9 +681,6 @@ class JobManager:
         # 通話結果の社名を正規化
         call_results_df['社名_正規化'] = call_results_df['社名'].apply(self.normalize_text)
         
-        # 架電時刻列を保持（存在する場合）
-        has_call_time = '架電時刻' in call_results_df.columns
-        
         # 社名ベースでマージ
         merged_df = pd.merge(
             call_results_df, 
@@ -677,13 +703,9 @@ class JobManager:
             axis=1
         )
         
-        # 列の順序を整理（架電時刻を含める）
-        if has_call_time:
-            column_order = ['fm_id', '社名', '電話番号', '架電時刻', 'ステータス', '架電結果', '要約', '通話時間', 
-                           '住所統合', '最終トーク判定', '最終有効無効', '最終決済担当', 'row_key']
-        else:
-            column_order = ['fm_id', '社名', '電話番号', 'ステータス', '架電結果', '要約', '通話時間', 
-                           '住所統合', '最終トーク判定', '最終有効無効', '最終決済担当', 'row_key']
+        # 列の順序を整理
+        column_order = ['fm_id', '社名', '電話番号', 'ステータス', '架電結果', '要約', '通話時間', 
+                       '住所統合', '最終トーク判定', '最終有効無効', '最終決済担当', 'row_key']
         
         # 存在する列のみを選択
         available_columns = [col for col in column_order if col in merged_df.columns]
@@ -693,15 +715,22 @@ class JobManager:
     
     def calculate_statistics(self, df):
         """統計を計算"""
-        def parse_duration(duration_str):
-            """通話時間を秒に変換"""
-            if pd.isna(duration_str) or duration_str == "-":
+        def parse_duration(val):
+            if pd.isna(val):
                 return 0
+            val = str(val).strip()
+            if val in ["", "-", "nan"]:
+                return 0
+            parts = val.split(":")
             try:
-                parts = str(duration_str).split(":")
-                if len(parts) == 2:
-                    return int(parts[0]) * 60 + int(parts[1])
-                return 0
+                if len(parts) == 3:  # hh:mm:ss
+                    h, m, s = map(int, parts)
+                    return h*3600 + m*60 + s
+                elif len(parts) == 2:  # mm:ss
+                    m, s = map(int, parts)
+                    return m*60 + s
+                else:
+                    return int(val)  # 秒数
             except:
                 return 0
         
@@ -727,15 +756,15 @@ class JobManager:
         
         return {
             'total_calls': total_calls,
-            'result_counts': result_counts,
             'valid_calls': valid_calls,
             'total_time': total_time_str,
             'transfer_calls': transfer_calls,
             'invalid_numbers': invalid_numbers,
-            'error_calls': error_calls
+            'error_calls': error_calls,
+            'result_counts': result_counts.to_dict()
         }
 
-# ジョブカード表示関数
+# 改良されたジョブカード表示関数
 def display_job_card(job):
     """見やすいジョブカードを表示"""
     status_class = f"status-{job.get('status', 'created')}"
@@ -746,18 +775,12 @@ def display_job_card(job):
     st.markdown(f"""
     <div class="job-card">
         <div class="job-card-header">
-            <span>📋 {job['output_name']}</span>
+            <span>🎯 {job['job_id']} - {job['output_name']}</span>
             <span class="status-badge {status_class}">
-                {'✅ 作成済み' if job.get('status') == 'created' else '⏳ 処理中'}
+                <span class="small-icon">●</span> {job['status']}
             </span>
         </div>
         <div class="job-info-grid">
-            <div class="job-info-item">
-                <div class="job-info-label">
-                    <span class="small-icon">🆔</span> ジョブID
-                </div>
-                <div class="job-info-value">{job['job_id']}</div>
-            </div>
             <div class="job-info-item">
                 <div class="job-info-label">
                     <span class="small-icon">📅</span> 作成日時
@@ -766,15 +789,21 @@ def display_job_card(job):
             </div>
             <div class="job-info-item">
                 <div class="job-info-label">
-                    <span class="small-icon">📁</span> 元ファイル
+                    <span class="small-icon">📄</span> 元ファイル
                 </div>
                 <div class="job-info-value">{job['filename']}</div>
             </div>
             <div class="job-info-item">
                 <div class="job-info-label">
-                    <span class="small-icon">📊</span> データ件数
+                    <span class="small-icon">🤖</span> レーン
                 </div>
-                <div class="job-info-value">{job.get('total_rows', 'N/A'):,} 件</div>
+                <div class="job-info-value">{job['robot_count']} 番</div>
+            </div>
+            <div class="job-info-item">
+                <div class="job-info-label">
+                    <span class="small-icon">📊</span> 処理件数
+                </div>
+                <div class="job-info-value">{job['total_rows']:,} 件</div>
             </div>
         </div>
     </div>
@@ -800,7 +829,7 @@ def display_metrics(stats):
         <div class="metric-card">
             <div class="metric-value">{stats['valid_calls']:,}</div>
             <div class="metric-label">
-                <span class="small-icon">✅</span> 有効架電数
+                <span class="small-icon">✅</span> 有効通話
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -810,7 +839,7 @@ def display_metrics(stats):
         <div class="metric-card">
             <div class="metric-value">{stats['transfer_calls']:,}</div>
             <div class="metric-label">
-                <span class="small-icon">🎯</span> APO獲得数
+                <span class="small-icon">🎯</span> APO獲得
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -828,47 +857,31 @@ def display_metrics(stats):
 
 # メインアプリケーション
 def main():
+    # セッション状態の初期化
+    initialize_session_state()
+    
     st.markdown('<h1 class="main-header">📞 AIテレアポ管理システム</h1>', unsafe_allow_html=True)
     
-    # ジョブ履歴マネージャーを初期化
-    history_manager = JobHistoryManager()
-    
-    # セッション状態の初期化
-    if 'jobs' not in st.session_state:
-        st.session_state.jobs = history_manager.load_jobs()
-    
-    # ジョブマネージャーを初期化
-    manager = JobManager()
+    manager = AITeleapoManager()
+    history_manager = st.session_state.history_manager
     
     # サイドバー
-    with st.sidebar:
-        st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-        st.markdown('<h4>📚 システムガイド</h4>', unsafe_allow_html=True)
-        st.markdown("""
-        <p><strong>このシステムの使い方:</strong></p>
-        <ol>
-            <li><strong>新規ジョブ作成</strong>でFileMakerデータをアップロード</li>
-            <li>生成されたCSVをAIテレアポにアップロード</li>
-            <li>通話結果CSVをダウンロード</li>
-            <li><strong>結果分析</strong>で通話結果を分析・マージ</li>
-            <li>最終結果をダウンロードしてFileMakerにインポート</li>
-        </ol>
-        """, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        st.markdown('<div class="sidebar-section">', unsafe_allow_html=True)
-        st.markdown('<h4>ℹ️ システム情報</h4>', unsafe_allow_html=True)
-        st.markdown(f"""
-        <p><strong>保存済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
-        <p><strong>バージョン:</strong> 2.0</p>
-        """, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    st.sidebar.title("🎛️ 操作メニュー")
     
-    # メニュー選択
-    menu = st.selectbox(
-        "メニューを選択",
-        ["📤 新規ジョブ作成", "📥 結果分析", "📋 ジョブ履歴", "⚙️ 設定"],
-        label_visibility="collapsed"
+    # システム情報を表示
+    st.sidebar.markdown(f"""
+    <div class="sidebar-section">
+        <h4><span class="small-icon">📊</span> システム情報</h4>
+        <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
+        <p><strong>保存場所:</strong> {manager.base_dir.name}/</p>
+
+
+    </div>
+    """, unsafe_allow_html=True)
+    
+    menu = st.sidebar.selectbox(
+        "機能を選択",
+        ["📤 新規ジョブ作成", "📥 結果分析", "📊 ジョブ履歴", "⚙️ 設定"]
     )
     
     if menu == "📤 新規ジョブ作成":
@@ -881,102 +894,99 @@ def main():
             uploaded_file = st.file_uploader(
                 "Excelファイルをアップロードしてください",
                 type=['xlsx', 'xls'],
-                help="FileMakerからエクスポートしたExcelファイルを選択してください"
+                help="FileMakerから出力したExcelファイルを選択してください"
             )
+            
+            if uploaded_file:
+                try:
+                    df = pd.read_excel(uploaded_file)
+                    st.markdown(f"""
+                    <div class="success-box">
+                        <h4>✅ ファイル読み込み完了</h4>
+                        <p><strong>ファイル名:</strong> {uploaded_file.name}</p>
+                        <p><strong>データ件数:</strong> {len(df):,} 件</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # データプレビュー
+                    with st.expander("📋 データプレビュー"):
+                        st.dataframe(df.head(10), use_container_width=True)
+                    
+                    # 出力ファイル名の指定（自動生成）
+                    st.subheader("📝 出力設定")
+                    # 元ファイル名から拡張子を除去
+                    base_filename = uploaded_file.name.rsplit('.', 1)[0]
+                    # 日付を追加
+                    date_str = datetime.now().strftime("%Y%m%d")
+                    # 自動生成されたファイル名を表示
+                    output_name = f"{base_filename}_{date_str}_AIテレアポリスト"
+                    st.text_input(
+                        "出力ファイル名",
+                        value=output_name,
+                        disabled=True,
+                        help="元ファイル名+日付+AIテレアポリストで自動生成されます"
+                    )
+                    
+                    # ロボット台数選択
+                    robot_count = st.selectbox(
+                        "🤖 使用するロボット台数",
+                        [1, 2, 3, 4, 5],
+                        index=2,
+                        help="同時に使用するAIテレアポロボットの台数"
+                    )
+                    
+                    if st.button("🚀 ジョブを作成", type="primary"):
+                        with st.spinner("ジョブを作成中..."):
+                            job_id = manager.generate_job_id()
+                            result = manager.process_filemaker_data(df, job_id, output_name)
+                            
+                            # セッション状態に保存
+                            job_info = {
+                                'job_id': job_id,
+                                'created_at': datetime.now(),
+                                'filename': uploaded_file.name,
+                                'output_name': output_name,
+                                'robot_count': robot_count,
+                                'total_rows': result['total_rows'],
+                                'status': 'created'
+                            }
+                            st.session_state.jobs.append(job_info)
+                            
+                            # ファイルに保存
+                            history_manager.save_jobs(st.session_state.jobs)
+                            
+                            st.markdown(f"""
+                            <div class="success-box">
+                                <h4>✅ ジョブ作成完了</h4>
+                                <p><strong>ジョブID:</strong> {job_id}</p>
+                                <p><strong>処理件数:</strong> {result['total_rows']:,} 件</p>
+                                <p><strong>アップロード用ファイル:</strong> {result['upload_path']}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # ダウンロードボタン
+                            with open(result['upload_path'], 'rb') as f:
+                                st.download_button(
+                                    label="📤 AIテレアポ用CSVをダウンロード",
+                                    data=f.read(),
+                                    file_name=f"{output_name}.csv",
+                                    mime="text/csv",
+                                    type="primary"
+                                )
+                
+                except Exception as e:
+                    st.error(f"❌ ファイル処理エラー: {str(e)}")
         
         with col2:
             st.markdown("""
-            <div class="info-box">
-                <h4>💡 ヒント</h4>
-                <p>FileMakerから以下の列を含むExcelファイルをエクスポートしてください:</p>
-                <ul>
-                    <li>顧客名（または社名）</li>
-                    <li>電話番号</li>
-                    <li>住所統合</li>
-                    <li>IDの頭にID</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        if uploaded_file:
-            try:
-                df = pd.read_excel(uploaded_file)
-                
-                st.markdown('<h3 class="section-header">📊 データプレビュー</h3>', unsafe_allow_html=True)
-                st.dataframe(df.head(10), use_container_width=True)
-                
-                st.markdown(f"""
-                <div class="info-box">
-                    <p><strong>データ件数:</strong> {len(df):,} 件</p>
-                    <p><strong>列数:</strong> {len(df.columns)} 列</p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                if st.button("🚀 AIテレアポ用CSVを生成", type="primary", use_container_width=True):
-                    with st.spinner("CSVを生成しています..."):
-                        # ジョブIDを生成
-                        job_id = manager.generate_job_id()
-                        
-                        # 出力ファイル名を自動生成
-                        base_filename = uploaded_file.name.rsplit('.', 1)[0]
-                        # 日付を追加
-                        date_str = datetime.now().strftime("%Y%m%d")
-                        # 自動生成されたファイル名を表示
-                        output_name = f"{base_filename}_{date_str}_AIテレアポリスト"
-                        
-                        # ジョブを作成
-                        result = manager.create_job(df, uploaded_file.name, output_name)
-                        
-                        # ジョブ情報を保存
-                        if 'jobs' not in st.session_state:
-                            st.session_state.jobs = []
-                        
-                        job_info = {
-                            'job_id': job_id,
-                            'created_at': datetime.now(),
-                            'filename': uploaded_file.name,
-                            'output_name': output_name,
-                            'status': 'created',
-                            'total_rows': len(df)
-                        }
-                        
-                        st.session_state.jobs.insert(0, job_info)
-                        history_manager.save_jobs(st.session_state.jobs)
-                        
-                        # ダウンロード用のデータを準備
-                        with open(result['upload_path'], 'rb') as f:
-                            csv_data = f.read()
-                        
-                        # キャッシュに保存
-                        history_manager.cache_download(job_id, csv_data, f"{output_name}.csv")
-                        
-                        st.markdown(f"""
-                        <div class="success-box">
-                            <h4>✅ CSV生成完了!</h4>
-                            <p><strong>ジョブID:</strong> {job_id}</p>
-                            <p><strong>ファイル名:</strong> {output_name}.csv</p>
-                            <p><strong>データ件数:</strong> {len(df):,} 件</p>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                        # ダウンロードボタン
-                        st.markdown('<div class="download-section">', unsafe_allow_html=True)
-                        st.download_button(
-                            label="📥 AIテレアポ用CSVをダウンロード",
-                            data=csv_data,
-                            file_name=f"{output_name}.csv",
-                            mime="text/csv",
-                            use_container_width=True
-                        )
-                        st.markdown('</div>', unsafe_allow_html=True)
-                        
-            except Exception as e:
-                st.error(f"エラーが発生しました: {e}")
-        else:
-            st.markdown("""
-            <div class="warning-box">
-                <h4>⚠️ ファイルが選択されていません</h4>
-                <p>FileMakerからエクスポートしたExcelファイルをアップロードしてください。</p>
+            <div class="sidebar-section">
+                <h4><span class="small-icon">📋</span> 作成の流れ</h4>
+                <ol>
+                    <li><strong><span class="small-icon">📤</span> 新規ジョブ作成</strong><br>FileMakerから出力したExcelファイルを選択</li>
+                    <li><strong><span class="small-icon">📤</span> 結果分析</strong><br>AIテレアポ結果の分析&ファイルメーカー返送用データ作成</li>
+                    <li><strong><span class="small-icon">📊</span> ジョブ履歴</strong><br>保管されているファイルメーカーデータの管理</li>
+                    <li><strong><span class="small-icon">⚙️</span> 設定</strong><br>ジョブの削除&再読み込み</li>
+                </ol>
             </div>
             """, unsafe_allow_html=True)
     
@@ -991,167 +1001,180 @@ def main():
             # ジョブ選択
             if st.session_state.jobs:
                 job_options = [f"{job['job_id']} - {job['output_name']}" for job in st.session_state.jobs]
-                selected_job_str = st.selectbox("ジョブを選択", job_options)
+                selected_job_str = st.selectbox("分析対象のジョブを選択", job_options)
                 selected_job_id = selected_job_str.split(" - ")[0]
-                selected_job = next((job for job in st.session_state.jobs if job['job_id'] == selected_job_id), None)
-                
-                if selected_job:
-                    display_job_card(selected_job)
             else:
-                st.warning("ジョブが見つかりません。先に新規ジョブを作成してください。")
-                selected_job = None
+                st.markdown("""
+                <div class="warning-box">
+                    <h4>⚠️ ジョブが見つかりません</h4>
+                    <p>作成されたジョブがありません。まず新規ジョブを作成してください。</p>
+                </div>
+                """, unsafe_allow_html=True)
+                selected_job_id = None
             
-            # 通話結果CSVのアップロード
-            st.markdown('<h3 class="section-header">📤 通話結果のアップロード</h3>', unsafe_allow_html=True)
-            call_results_file = st.file_uploader(
-                "AIテレアポからダウンロードした通話結果CSVをアップロードしてください",
+            # 結果ファイルのアップロード
+            results_file = st.file_uploader(
+                "AIテレアポの結果CSVをアップロードしてください",
                 type=['csv'],
-                help="AIテレアポシステムからダウンロードした通話履歴CSVを選択してください"
+                help="AIテレアポシステムからダウンロードした結果CSVファイル"
             )
-        
-        with col2:
-            st.markdown("""
-            <div class="info-box">
-                <h4>💡 分析の流れ</h4>
-                <ol>
-                    <li>対象ジョブを選択</li>
-                    <li>通話結果CSVをアップロード</li>
-                    <li>自動で結果を分類・分析</li>
-                    <li>元データとマージ</li>
-                    <li>最終結果をダウンロード</li>
-                </ol>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        if call_results_file and selected_job:
-            try:
-                # CSVを読み込み（エンコーディング自動判定）
+            
+            if results_file and selected_job_id:
                 try:
-                    call_df = pd.read_csv(call_results_file, encoding='utf-8')
-                except:
-                    call_df = pd.read_csv(call_results_file, encoding='shift_jis')
+                    # CSVファイルを読み込み（エンコーディング自動判定）
+                    try:
+                        df = pd.read_csv(results_file, encoding='utf-8')
+                    except UnicodeDecodeError:
+                        try:
+                            df = pd.read_csv(results_file, encoding='shift_jis')
+                        except UnicodeDecodeError:
+                            df = pd.read_csv(results_file, encoding='cp932')
+                    
+                    st.success(f"✅ ファイル読み込み完了: {results_file.name} ({len(df):,} 件)")
+                    
+                    # データプレビュー
+                    with st.expander("📋 結果データプレビュー"):
+                        st.dataframe(df.head(10), use_container_width=True)
+                    
+                    if st.button("🔍 結果を分析", type="primary"):
+                        with st.spinner("結果を分析中..."):
+                            # 通話結果を分析
+                            analyzed_df = manager.analyze_call_results(df)
+                            
+                            # 統計を計算
+                            stats = manager.calculate_statistics(analyzed_df)
+                            
+                            st.subheader("📊 分析結果")
+                            
+                            # 改良されたメトリクス表示
+                            display_metrics(stats)
+                            
+                            # 詳細統計
+                            st.subheader("📈 詳細統計")
+                            col_a, col_b, col_c = st.columns(3)
+                            
+                            with col_a:
+                                st.markdown(f"""
+                                <div class="metric-card">
+                                    <div class="metric-value">{stats['total_time']}</div>
+                                    <div class="metric-label">
+                                        <span class="small-icon">⏱️</span> 総通話時間
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            with col_b:
+                                st.markdown(f"""
+                                <div class="metric-card">
+                                    <div class="metric-value">{stats['invalid_numbers']}</div>
+                                    <div class="metric-label">
+                                        <span class="small-icon">❌</span> 無効番号
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            with col_c:
+                                st.markdown(f"""
+                                <div class="metric-card">
+                                    <div class="metric-value">{stats['error_calls']}</div>
+                                    <div class="metric-label">
+                                        <span class="small-icon">⚠️</span> エラー件数
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
+                            
+                            # 結果分布
+                            st.subheader("📊 架電結果分布")
+                            result_df = pd.DataFrame(list(stats['result_counts'].items()), 
+                                                   columns=['結果', '件数'])
+                            st.dataframe(result_df, use_container_width=True)
+                            
+                            # 元データとマージ（社名ベース）
+                            merged_df = manager.merge_with_original(analyzed_df, selected_job_id)
+                            
+                            # マージ結果の確認
+                            st.subheader("🔗 マージ結果")
+                            matched_count = merged_df['fm_id'].notna().sum()
+                            match_rate = (matched_count / len(merged_df) * 100) if len(merged_df) > 0 else 0
+                            
+                            st.markdown(f"""
+                            <div class="info-box">
+                                <h4><span class="small-icon">📊</span> マッチング結果</h4>
+                                <p><strong>マッチした件数:</strong> {matched_count:,} / {len(merged_df):,} 件</p>
+                                <p><strong>マッチ率:</strong> {match_rate:.1f}%</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # 出力ファイル名の指定（自動生成）
+                            st.subheader("💾 結果保存")
+                            # 選択されたジョブの元ファイル名を取得
+                            selected_job = next((job for job in st.session_state.jobs if job['job_id'] == selected_job_id), None)
+                            if selected_job:
+                                base_filename = selected_job['filename'].rsplit('.', 1)[0]
+                                date_str = datetime.now().strftime("%Y%m%d")
+                                output_filename = f"{base_filename}_{date_str}_結果"
+                            else:
+                                output_filename = f"結果_{selected_job_id}"
+                            
+                            st.text_input(
+                                "出力ファイル名",
+                                value=output_filename,
+                                disabled=True,
+                                help="元ファイル名+日付+結果で自動生成されます"
+                            )
+                            
+                            # 修正版：結果を保存ボタンをクリックしたら即座に自動ダウンロード
+                            final_filename = f"{output_filename}.xlsx"
+                            
+                            # メモリ上でExcelファイルを作成
+                            buffer = BytesIO()
+                            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                                merged_df.to_excel(writer, index=False, sheet_name='分析結果')
+                            buffer.seek(0)
+                            excel_data = buffer.getvalue()
+                            
+                            # 自動ダウンロード機能付きボタン
+                            st.download_button(
+                                label="💾 結果を保存",
+                                data=excel_data,
+                                file_name=final_filename,
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key=f"auto_download_{selected_job_id}",
+                                type="primary",
+                                help="クリックすると即座にExcelファイルがダウンロードされます"
+                            )
+                            
+
+                            
+                            # データプレビュー
+                            with st.expander("📋 分析済みデータプレビュー"):
+                                st.dataframe(merged_df.head(20), use_container_width=True)
                 
-                st.markdown('<h3 class="section-header">📊 通話結果プレビュー</h3>', unsafe_allow_html=True)
-                st.dataframe(call_df.head(10), use_container_width=True)
-                
-                if st.button("🔍 結果を分析してマージ", type="primary", use_container_width=True):
-                    with st.spinner("分析中..."):
-                        # 通話結果を分析
-                        analyzed_df = manager.analyze_call_results(call_df)
-                        
-                        # 統計を計算
-                        stats = manager.calculate_statistics(analyzed_df)
-                        
-                        st.markdown('<h3 class="section-header">📈 分析結果</h3>', unsafe_allow_html=True)
-                        
-                        # 改良されたメトリクス表示
-                        display_metrics(stats)
-                        
-                        # 詳細統計
-                        st.subheader("📈 詳細統計")
-                        col_a, col_b, col_c = st.columns(3)
-                        
-                        with col_a:
-                            st.markdown(f"""
-                            <div class="metric-card">
-                                <div class="metric-value">{stats['total_time']}</div>
-                                <div class="metric-label">
-                                    <span class="small-icon">⏱️</span> 総通話時間
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        
-                        with col_b:
-                            st.markdown(f"""
-                            <div class="metric-card">
-                                <div class="metric-value">{stats['invalid_numbers']:,}</div>
-                                <div class="metric-label">
-                                    <span class="small-icon">❌</span> 無効番号
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        
-                        with col_c:
-                            st.markdown(f"""
-                            <div class="metric-card">
-                                <div class="metric-value">{stats['error_calls']:,}</div>
-                                <div class="metric-label">
-                                    <span class="small-icon">⚠️</span> エラー件数
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        
-                        # 結果分布
-                        st.subheader("📊 架電結果分布")
-                        result_df = pd.DataFrame(list(stats['result_counts'].items()), 
-                                               columns=['結果', '件数'])
-                        st.dataframe(result_df, use_container_width=True)
-                        
-                        # 元データとマージ（社名ベース）
-                        merged_df = manager.merge_with_original(analyzed_df, selected_job_id)
-                        
-                        st.markdown('<h3 class="section-header">📋 マージ結果プレビュー</h3>', unsafe_allow_html=True)
-                        st.dataframe(merged_df.head(20), use_container_width=True)
-                        
-                        # 最終結果をダウンロード
-                        output_buffer = BytesIO()
-                        with pd.ExcelWriter(output_buffer, engine='openpyxl') as writer:
-                            merged_df.to_excel(writer, index=False, sheet_name='通話結果')
-                        
-                        excel_data = output_buffer.getvalue()
-                        
-                        # ファイル名を生成
-                        if selected_job:
-                            base_filename = selected_job['filename'].rsplit('.', 1)[0]
-                            date_str = datetime.now().strftime("%Y%m%d")
-                            output_filename = f"{base_filename}_{date_str}_結果"
-                        else:
-                            output_filename = f"通話結果_{datetime.now().strftime('%Y%m%d')}"
-                        
-                        st.markdown('<div class="download-section">', unsafe_allow_html=True)
-                        st.markdown("""
-                        <h4>✅ 分析完了!</h4>
-                        <p>以下のボタンから最終結果をダウンロードし、FileMakerにインポートしてください。</p>
-                        """, unsafe_allow_html=True)
-                        
-                        st.download_button(
-                            label="📥 最終結果をダウンロード (Excel)",
-                            data=excel_data,
-                            file_name=f"{output_filename}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True
-                        )
-                        st.markdown('</div>', unsafe_allow_html=True)
-                        
-            except Exception as e:
-                st.error(f"エラーが発生しました: {e}")
-                import traceback
-                st.code(traceback.format_exc())
+                except Exception as e:
+                    st.error(f"❌ 結果分析エラー: {str(e)}")
+        
+
     
-    elif menu == "📋 ジョブ履歴":
-        st.markdown('<h2 class="section-header"><span class="small-icon">📋</span> ジョブ履歴</h2>', unsafe_allow_html=True)
+    elif menu == "📊 ジョブ履歴":
+        st.markdown('<h2 class="section-header"><span class="small-icon">📊</span> ジョブ履歴</h2>', unsafe_allow_html=True)
         
         if st.session_state.jobs:
-            for job in st.session_state.jobs:
+            st.subheader("📋 作成済みジョブ一覧")
+            st.markdown(f"""
+            <div class="info-box">
+                <h4><span class="small-icon">💾</span> ファイルベース履歴管理</h4>
+                <p>ジョブ履歴は job_history.json ファイルに保存されており、アプリケーション再起動時に自動で復元されます。</p>
+                <p><strong>保存済みジョブ数:</strong> {len(st.session_state.jobs)} 件</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # ジョブを新しい順に表示
+            for job in reversed(st.session_state.jobs):
                 display_job_card(job)
-                
-                # キャッシュされたダウンロードデータがあれば表示
-                cached = history_manager.get_cached_download(job['job_id'])
-                if cached:
-                    st.download_button(
-                        label=f"📥 {cached['filename']} を再ダウンロード",
-                        data=cached['data'],
-                        file_name=cached['filename'],
-                        mime="text/csv",
-                        key=f"download_{job['job_id']}"
-                    )
-                
-                st.markdown("---")
         else:
             st.markdown("""
             <div class="info-box">
-                <h4>ℹ️ ジョブ履歴がありません</h4>
-                <p>新規ジョブを作成すると、ここに履歴が表示されます。</p>
+                <h4><span class="small-icon">📝</span> ジョブ履歴が空です</h4>
+                <p>まだジョブが作成されていません。「📤 新規ジョブ作成」から最初のジョブを作成してください。</p>
+                <p>作成されたジョブは自動的にファイルに保存され、次回起動時に復元されます。</p>
             </div>
             """, unsafe_allow_html=True)
     
@@ -1166,14 +1189,28 @@ def main():
             if st.button("🗑️ ジョブ履歴をクリア", type="secondary"):
                 st.session_state.jobs = []
                 history_manager.clear_jobs()
-                st.success("ジョブ履歴をクリアしました")
-                st.rerun()
+                st.success("✅ ジョブ履歴をクリアしました。")
         
         with col2:
-            if st.button("🔄 ジョブ履歴を再読み込み", type="secondary"):
+            if st.button("🔄 履歴を再読み込み", type="secondary"):
                 st.session_state.jobs = history_manager.load_jobs()
-                st.success("ジョブ履歴を再読み込みしました")
-                st.rerun()
+                st.success("✅ ジョブ履歴を再読み込みしました。")
+        
+        st.subheader("ℹ️ システム情報")
+        history_file_exists = history_manager.history_file.exists()
+        cache_files = len(list(history_manager.download_cache_dir.glob("*.pkl")))
+        
+        st.markdown(f"""
+        <div class="info-box">
+            <h4><span class="small-icon">📊</span> システム詳細</h4>
+            <p><strong>ジョブ保存場所:</strong> {manager.base_dir.absolute()}</p>
+            <p><strong>履歴ファイル:</strong> {history_manager.history_file.absolute()}</p>
+            <p><strong>履歴ファイル存在:</strong> {'✅ あり' if history_file_exists else '❌ なし'}</p>
+            <p><strong>キャッシュファイル数:</strong> {cache_files} 個</p>
+            <p><strong>作成済みジョブ数:</strong> {len(st.session_state.jobs)}</p>
+            <p><strong>バージョン:</strong> 8.0.0 (5レーン対応版)</p>
+        </div>
+        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
