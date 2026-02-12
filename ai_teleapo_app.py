@@ -592,8 +592,27 @@ class AITeleapoManager:
         df["電話番号"] = df["電話番号"].astype(str).str.replace(r'^\+81\s*', '0', regex=True)
         df["電話番号"] = df["電話番号"].str.replace(" ", "")
         
-        # 通話時間を数値化
-        df["通話時間_num"] = pd.to_numeric(df["通話時間"], errors="coerce")
+        # 通話時間を数値化（mm:ss形式を秒数に変換）
+        def parse_duration_to_seconds(val):
+            if pd.isna(val):
+                return 0
+            val = str(val).strip()
+            if val in ["", "-", "nan"]:
+                return 0
+            parts = val.split(":")
+            try:
+                if len(parts) == 3:  # hh:mm:ss
+                    h, m, s = map(int, parts)
+                    return h*3600 + m*60 + s
+                elif len(parts) == 2:  # mm:ss
+                    m, s = map(int, parts)
+                    return m*60 + s
+                else:
+                    return int(val)  # 秒数
+            except:
+                return 0
+        
+        df["通話時間_num"] = df["通話時間"].apply(parse_duration_to_seconds)
         
         # 断り・終了系ワード
         ng_words = [
@@ -635,8 +654,8 @@ class AITeleapoManager:
                 df.at[idx, "架電結果"] = "NG"
                 continue
             
-            # 通話時間が0 → 留守
-            if duration == 0:
+            # 通話時間が0またはNaN → 留守
+            if pd.isna(duration) or duration == 0:
                 df.at[idx, "架電結果"] = "留守"
                 continue
             
