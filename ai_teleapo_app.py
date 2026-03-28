@@ -533,6 +533,10 @@ class AITeleapoManager:
         if '社名' in upload_df.columns:
             upload_df['社名'] = upload_df['社名'].astype(str).str[:50]
         
+        # 「IDの頭にID」カラムをD列（4列目）に追加
+        if 'IDの頭にID' in df.columns:
+            upload_df['IDの頭にID'] = df['IDの頭にID'].values
+        
         # 行指紋を作成してrowmapを生成(社名ベース)
         rowmap_data = []
         for idx, row in df.iterrows():
