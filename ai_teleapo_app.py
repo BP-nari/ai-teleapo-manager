@@ -752,7 +752,7 @@ def page_history():
     st.markdown("""
     <div class="topbar-hist">
         <h2>ジョブ履歴</h2>
-        <p>処理済みジョブの一覧。ファイル名はクリックしてコピー可能。</p>
+        <p>処理済みジョブの一覧。定期的に消さないと容量なくなる</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -796,7 +796,7 @@ def page_history():
                 <div class="job-meta-item"><strong>入力</strong>　{job.get('rows_in', 0):,} 件</div>
                 <div class="job-meta-item"><strong>出力</strong>　{job.get('rows_out', 0):,} 件</div>
             </div>
-            <div class="job-fname">ファイル名（クリックして選択）: {job.get('filename', '-')}</div>
+            <div class="job-fname">ファイル名: {job.get('filename', '-')}</div>
         </div>
         """, unsafe_allow_html=True)
 
