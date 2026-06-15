@@ -450,37 +450,74 @@ def page_home():
     with c3:
         st.metric("AIテレアポ", f"{ai_count:,}")
 
+    # カードをボタンで実装（クリックでページ遷移）
     st.markdown("""
-    <div class="home-grid">
-        <div class="home-card home-card-ds">
-            <div class="tag">DIAL SHIFT</div>
-            <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.08em;opacity:0.7;text-transform:uppercase;">01</div>
-            <h3>リスト成形</h3>
-            <p>Excelをアップロードして顧客名・電話番号・住所を整形。電話番号バリデーション付き。</p>
-        </div>
-        <div class="home-card home-card-ds">
-            <div class="tag">DIAL SHIFT</div>
-            <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.08em;opacity:0.7;text-transform:uppercase;">02</div>
-            <h3>ファイルメーカー返送</h3>
-            <p>ダイヤルシフトの履歴CSVをアップロードしてコール結果変換・有効無効判定を付与。</p>
-        </div>
-        <div class="home-card home-card-ai">
-            <div class="tag">AI TELEAPO</div>
-            <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.08em;opacity:0.7;text-transform:uppercase;">03</div>
-            <h3>リスト成形</h3>
-            <p>FileMakerデータをAIテレアポ投入用CSVに変換。社名・電話番号・住所統合・IDを整形。</p>
-        </div>
-        <div class="home-card home-card-wip">
-            <div class="tag">COMING SOON</div>
-            <div style="font-size:0.7rem;font-weight:700;letter-spacing:0.08em;opacity:0.7;text-transform:uppercase;">04</div>
-            <h3>ファイルメーカー返送</h3>
-            <p>現在開発中です。</p>
-        </div>
-    </div>
-    <div class="alert-info" style="margin-top:1.5rem;">
-        左のサイドバーから機能を選択してください。
-    </div>
+    <style>
+    div[data-testid="column"] .stButton > button {
+        width: 100% !important;
+        height: 160px !important;
+        border-radius: 10px !important;
+        border: none !important;
+        color: white !important;
+        font-size: 1rem !important;
+        font-weight: 700 !important;
+        text-align: left !important;
+        padding: 1.4rem 1.5rem !important;
+        line-height: 1.6 !important;
+        white-space: pre-wrap !important;
+        cursor: pointer !important;
+        transition: opacity 0.15s !important;
+    }
+    div[data-testid="column"] .stButton > button:hover {
+        opacity: 0.88 !important;
+        transform: translateY(-2px) !important;
+    }
+    button[kind="secondary"][data-testid="baseButton-secondary"]:nth-child(1) { background: #1e3a8a !important; }
+    </style>
     """, unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+    col3, col4 = st.columns(2)
+
+    with col1:
+        st.markdown('<div style="background:#1e3a8a;border-radius:10px;padding:1.5rem;color:white;cursor:pointer;margin-bottom:1rem;position:relative;">' +
+            '<span style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.2);border-radius:4px;padding:0.15rem 0.55rem;font-size:0.65rem;font-weight:700;">DIAL SHIFT</span>' +
+            '<div style="font-size:0.7rem;font-weight:700;opacity:0.7;text-transform:uppercase;margin-bottom:0.4rem;">01</div>' +
+            '<div style="font-size:1rem;font-weight:700;margin-bottom:0.4rem;">リスト成形</div>' +
+            '<div style="font-size:0.8rem;opacity:0.85;line-height:1.6;">Excelをアップロードして顧客名・電話番号・住所を整形。電話番号バリデーション付き。</div>' +
+            '</div>', unsafe_allow_html=True)
+        if st.button("このページへ移動", key="home_ds_list", use_container_width=True):
+            st.session_state.page = 'ds_list'; st.rerun()
+
+    with col2:
+        st.markdown('<div style="background:#1e3a8a;border-radius:10px;padding:1.5rem;color:white;cursor:pointer;margin-bottom:1rem;position:relative;">' +
+            '<span style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.2);border-radius:4px;padding:0.15rem 0.55rem;font-size:0.65rem;font-weight:700;">DIAL SHIFT</span>' +
+            '<div style="font-size:0.7rem;font-weight:700;opacity:0.7;text-transform:uppercase;margin-bottom:0.4rem;">02</div>' +
+            '<div style="font-size:1rem;font-weight:700;margin-bottom:0.4rem;">ファイルメーカー返送</div>' +
+            '<div style="font-size:0.8rem;opacity:0.85;line-height:1.6;">ダイヤルシフトの履歴CSVをアップロードしてコール結果変換・有効無効判定を付与。</div>' +
+            '</div>', unsafe_allow_html=True)
+        if st.button("このページへ移動", key="home_ds_fm", use_container_width=True):
+            st.session_state.page = 'ds_fm'; st.rerun()
+
+    with col3:
+        st.markdown('<div style="background:#0369a1;border-radius:10px;padding:1.5rem;color:white;cursor:pointer;margin-bottom:1rem;position:relative;">' +
+            '<span style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.2);border-radius:4px;padding:0.15rem 0.55rem;font-size:0.65rem;font-weight:700;">AI TELEAPO</span>' +
+            '<div style="font-size:0.7rem;font-weight:700;opacity:0.7;text-transform:uppercase;margin-bottom:0.4rem;">03</div>' +
+            '<div style="font-size:1rem;font-weight:700;margin-bottom:0.4rem;">リスト成形</div>' +
+            '<div style="font-size:0.8rem;opacity:0.85;line-height:1.6;">FileMakerデータをAIテレアポ投入用CSVに変換。社名・電話番号・住所統合・IDを整形。</div>' +
+            '</div>', unsafe_allow_html=True)
+        if st.button("このページへ移動", key="home_ai_list", use_container_width=True):
+            st.session_state.page = 'ai_list'; st.rerun()
+
+    with col4:
+        st.markdown('<div style="background:#475569;border-radius:10px;padding:1.5rem;color:white;margin-bottom:1rem;position:relative;">' +
+            '<span style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.2);border-radius:4px;padding:0.15rem 0.55rem;font-size:0.65rem;font-weight:700;">COMING SOON</span>' +
+            '<div style="font-size:0.7rem;font-weight:700;opacity:0.7;text-transform:uppercase;margin-bottom:0.4rem;">04</div>' +
+            '<div style="font-size:1rem;font-weight:700;margin-bottom:0.4rem;">ファイルメーカー返送</div>' +
+            '<div style="font-size:0.8rem;opacity:0.85;line-height:1.6;">現在開発中です。</div>' +
+            '</div>', unsafe_allow_html=True)
+        if st.button("工事中", key="home_ai_fm", use_container_width=True, disabled=True):
+            pass
 
 
 # ============================================================
@@ -739,8 +776,15 @@ def page_ai_fm():
 
     st.markdown("""
     <div class="wip-block">
-        <h2>せいさくちゅう</h2>
-
+        <h2>工事中</h2>
+        <p>
+            AIテレアポ用ファイルメーカー返送機能は現在開発中です。<br>
+            完成次第、こちらのページでご利用いただけます。<br><br>
+            現在ご利用可能な機能<br>
+            01 — ダイヤルシフト用リスト成形<br>
+            02 — ダイヤルシフト用ファイルメーカー返送<br>
+            03 — AIテレアポ用リスト成形
+        </p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -752,7 +796,7 @@ def page_history():
     st.markdown("""
     <div class="topbar-hist">
         <h2>ジョブ履歴</h2>
-        <p>処理済みジョブの一覧。定期的に消さないと容量なくなる</p>
+        <p>処理済みジョブの一覧。定期に消さないと容量なくなる</p>
     </div>
     """, unsafe_allow_html=True)
 
