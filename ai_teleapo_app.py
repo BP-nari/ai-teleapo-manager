@@ -306,20 +306,11 @@ CONVERSION_MAP = {
     "受電\u3000アポ禁": "アポ禁", "受電\u3000電話APO": "受電電話APO",
     "受電\u3000留守電": "留守電", "AIコールNG": "NG", "AIホットリード": "再コール・転送成功",
 }
-VALIDITY_MAP = {
-    "AI終話": "有効", "応答なし": "無効", "AI対応不可": "有効",
-    "AI同時接続": "有効", "留守番電話": "有効", "コール結果記録中": "有効",
-    "手動受信_未対応": "", "トスアップ応答前終了": "有効", "コール結果未登録": "有効",
-    "転送\u3000NG": "有効", "転送\u3000再コール": "有効", "転送\u3000アポ禁": "有効",
-    "転送\u3000留守電": "有効", "受電\u3000NG": "有効", "受電\u3000再コール": "有効",
-    "受電\u3000アポ禁": "有効", "受電\u3000電話APO": "有効", "受電\u3000留守電": "有効",
-    "AIコールNG": "無効", "AIホットリード": "有効",
-}
-DROP_FLAGS = {"転送\u3000お題成立", "転送\u3000紐づけ", "受電\u3000お題成立", "受電\u3000紐づけ"}
-DROP_COLUMNS = [
-    "次回コール予定日時", "次回コール予定日", "次回コール予定日時 (AI)",
-    "通話時間", "通話時間(秒)", "ステータス", "方向", "コール担当者",
-    "コールリスト", "通話ID", "文字起こし", "住所", "住所統合",
+DROP_FLAGS = {"転送　お題成立", "転送　紐づけ", "受電　お題成立", "受電　紐づけ"}
+
+# FM返送の出力列定義（この順序・列名で出力する）
+FM_OUTPUT_COLUMNS = [
+    "会社名", "電話番号", "前回結果", "前回コール日", "コール時間", "履歴内容", "営業担当", "IDの頭にID",
 ]
 
 def process_ds_fm(raw_bytes):
@@ -337,21 +328,37 @@ def process_ds_fm(raw_bytes):
 
     rows_before = len(df)
 
+    # コール日時 → 前回コール日（YYYY/M/D）+ コール時間（HH:MM:SS）に分割
     if "コール日時" in df.columns:
         call_datetime = pd.to_datetime(df["コール日時"], errors="coerce")
-        loc = df.columns.get_loc("コール日時")
-        df.insert(loc + 1, "コール日",   call_datetime.dt.strftime("%Y-%m-%d"))
-        df.insert(loc + 2, "コール時間", call_datetime.dt.strftime("%H:%M:%S"))
+        df["前回コール日"] = call_datetime.apply(
+            lambda dt: f"{dt.year}/{dt.month}/{dt.day}" if pd.notna(dt) else ""
+        )
+        df["コール時間"] = call_datetime.dt.strftime("%H:%M:%S")
         df = df.drop(columns=["コール日時"])
 
+    # コール結果 → 前回結果 に変換・列名変更
     if "コール結果" in df.columns:
-        original_result = df["コール結果"].astype("string").str.strip().str.replace(" ", "\u3000", regex=False)
+        original_result = df["コール結果"].astype("string").str.strip().str.replace(" ", "　", regex=False)
         df = df[~original_result.isin(DROP_FLAGS)].copy()
-        original_result = df["コール結果"].astype("string").str.strip().str.replace(" ", "\u3000", regex=False)
-        df["コール結果"]   = original_result.map(CONVERSION_MAP).fillna(original_result)
-        df["有効無効判定"] = original_result.map(VALIDITY_MAP).fillna("")
+        original_result = df["コール結果"].astype("string").str.strip().str.replace(" ", "　", regex=False)
+        df["前回結果"] = original_result.map(CONVERSION_MAP).fillna(original_result)
+        df = df.drop(columns=["コール結果"])
 
-    df = df.drop(columns=[c for c in DROP_COLUMNS if c in df.columns])
+    # 顧客名 → 会社名 に列名変更
+    if "顧客名" in df.columns and "会社名" not in df.columns:
+        df = df.rename(columns={"顧客名": "会社名"})
+
+    # コール担当者 → 営業担当 に列名変更
+    if "コール担当者" in df.columns and "営業担当" not in df.columns:
+        df = df.rename(columns={"コール担当者": "営業担当"})
+
+    # 出力列のみを指定順で抽出（存在しない列は空列として補完）
+    for col in FM_OUTPUT_COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
+    df = df[FM_OUTPUT_COLUMNS]
+
     rows_after = len(df)
     csv_bytes = df.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig")
     return csv_bytes, df, rows_before, rows_after, used_enc
@@ -626,10 +633,10 @@ def page_ds_fm():
                         job_id = add_job("DS FM返送", uploaded.name, rows_before, rows_after)
                         st.markdown(f'<div class="alert-info">ジョブID: <code>{job_id}</code></div>', unsafe_allow_html=True)
 
-                        if "コール結果" in result_df.columns:
-                            with st.expander("コール結果の分布"):
-                                dist = result_df["コール結果"].value_counts().reset_index()
-                                dist.columns = ["コール結果", "件数"]
+                        if "前回結果" in result_df.columns:
+                            with st.expander("前回結果の分布"):
+                                dist = result_df["前回結果"].value_counts().reset_index()
+                                dist.columns = ["前回結果", "件数"]
                                 st.dataframe(dist, use_container_width=True, hide_index=True)
 
                         with st.expander("出力データプレビュー（先頭5件）"):
@@ -650,12 +657,12 @@ def page_ds_fm():
         <div class="card">
             <div class="card-label">処理内容</div>
             <table class="stat-table">
-                <tr><td>コール日時 → コール日 / コール時間 に分割</td></tr>
+                <tr><td>顧客名 → 会社名 に列名変更</td></tr>
+                <tr><td>コール日時 → 前回コール日（YYYY/M/D）/ コール時間 に分割</td></tr>
                 <tr><td>お題成立・紐づけ行を削除</td></tr>
-                <tr><td>コール結果を変換マップで置換</td></tr>
-                <tr><td>有効無効判定を自動付与</td></tr>
-                <tr><td>不要列（通話時間・住所など）を削除</td></tr>
-                <tr><td>UTF-8 BOM付きCSVで出力</td></tr>
+                <tr><td>コール結果 → 前回結果 に変換・列名変更</td></tr>
+                <tr><td>コール担当者 → 営業担当 に列名変更</td></tr>
+                <tr><td>出力列を固定（8列）しUTF-8 BOM付きCSVで出力</td></tr>
             </table>
         </div>
         <div class="card" style="margin-top:0.5rem;">
