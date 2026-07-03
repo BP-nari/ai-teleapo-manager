@@ -345,12 +345,20 @@ def process_ds_fm(raw_bytes):
         df["前回結果"] = original_result.map(CONVERSION_MAP).fillna(original_result)
         df = df.drop(columns=["コール結果"])
 
-    # 顧客名 → 会社名 に列名変更
-    if "顧客名" in df.columns and "会社名" not in df.columns:
+    # 名前 / 顧客名 → 会社名 に列名変更
+    if "名前" in df.columns and "会社名" not in df.columns:
+        df = df.rename(columns={"名前": "会社名"})
+    elif "顧客名" in df.columns and "会社名" not in df.columns:
         df = df.rename(columns={"顧客名": "会社名"})
 
-    # コール担当者 → 営業担当 に列名変更
-    if "コール担当者" in df.columns and "営業担当" not in df.columns:
+    # コールメモ → 履歴内容 に列名変更
+    if "コールメモ" in df.columns and "履歴内容" not in df.columns:
+        df = df.rename(columns={"コールメモ": "履歴内容"})
+
+    # 担当者 / コール担当者 → 営業担当 に列名変更
+    if "担当者" in df.columns and "営業担当" not in df.columns:
+        df = df.rename(columns={"担当者": "営業担当"})
+    elif "コール担当者" in df.columns and "営業担当" not in df.columns:
         df = df.rename(columns={"コール担当者": "営業担当"})
 
     # 出力列のみを指定順で抽出（存在しない列は空列として補完）
