@@ -54,7 +54,7 @@ section[data-testid="stSidebar"] .stButton > button:hover {
     padding: 1.25rem 1.75rem; margin-bottom: 1.5rem; color: white;
 }
 .topbar-ai {
-    background: #0369a1; border-radius: 10px;
+    background: #0f766e; border-radius: 10px;
     padding: 1.25rem 1.75rem; margin-bottom: 1.5rem; color: white;
 }
 .topbar-hist {
@@ -90,7 +90,7 @@ section[data-testid="stSidebar"] .stButton > button:hover {
 .sn-ai {
     display: inline-flex; align-items: center; justify-content: center;
     width: 22px; height: 22px; border-radius: 50%;
-    background: #0369a1; color: white;
+    background: #0f766e; color: white;
     font-size: 0.72rem; font-weight: 700;
     margin-right: 0.5rem; vertical-align: middle;
 }
@@ -104,7 +104,7 @@ section[data-testid="stSidebar"] .stButton > button:hover {
 .home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem; }
 .home-card { border-radius: 10px; padding: 1.5rem; color: white; position: relative; }
 .home-card-ds  { background: #1e3a8a; }
-.home-card-ai  { background: #0369a1; }
+.home-card-ai  { background: #0f766e; }
 .home-card-wip { background: #475569; }
 .home-card .tag {
     position: absolute; top: 1rem; right: 1rem;
@@ -144,7 +144,7 @@ section[data-testid="stSidebar"] .stButton > button:hover {
     word-break: break-all;
 }
 .badge-ds { background: #dbeafe; color: #1e40af; border-radius: 4px; padding: 0.15rem 0.5rem; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; }
-.badge-ai { background: #e0f2fe; color: #0369a1; border-radius: 4px; padding: 0.15rem 0.5rem; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; }
+.badge-ai { background: #ccfbf1; color: #0f766e; border-radius: 4px; padding: 0.15rem 0.5rem; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; }
 
 /* ダウンロードボタン */
 .stDownloadButton > button {
@@ -373,6 +373,60 @@ def process_ds_fm(raw_bytes):
 
 
 # ============================================================
+# ロジック: AI FM返送（CSV入力 → Excel出力 1シート）
+# ============================================================
+AI_FM_OUTPUT_COLUMNS = [
+    "日時", "種別", "会社名", "担当者名", "電話番号",
+    "ステータス", "最終ステータス", "ラベル", "通話時間",
+    "架電結果", "要約", "詳細リンク",
+    "再電話回数", "メールアドレス", "最終試行", "総試行回数",
+    "ソース", "IDの頭にID",
+]
+
+def process_ai_fm(raw_bytes, source_filename=""):
+    df = None
+    used_enc = None
+    for enc in ["utf-8-sig", "utf-8", "cp932", "shift_jis"]:
+        try:
+            df = pd.read_csv(BytesIO(raw_bytes), encoding=enc)
+            used_enc = enc
+            break
+        except Exception:
+            continue
+    if df is None:
+        raise ValueError("CSVを読み込めませんでした。文字コードを確認してください。")
+
+    rows_before = len(df)
+
+    # IDの頭にID で重複排除（最新コールのみ残す）
+    if "IDの頭にID" in df.columns and "日時" in df.columns:
+        df["_dt"] = pd.to_datetime(df["日時"], errors="coerce")
+        df = df.sort_values("_dt", ascending=False)
+        df = df.drop_duplicates(subset=["IDの頭にID"], keep="first")
+        df = df.drop(columns=["_dt"])
+        df = df.sort_values("日時", ascending=False).reset_index(drop=True)
+
+    rows_after = len(df)
+
+    # ソース列を付与
+    df["ソース"] = source_filename
+
+    # 出力列を固定（存在しない列は空列で補完）
+    for col in AI_FM_OUTPUT_COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
+    df = df[AI_FM_OUTPUT_COLUMNS]
+
+    # Excelとして出力（1シート）
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="通話履歴")
+    excel_bytes = buf.getvalue()
+
+    return excel_bytes, df, rows_before, rows_after, used_enc
+
+
+# ============================================================
 # ロジック: AI リスト成形（Excel入力）
 # ============================================================
 def process_ai_list(file_bytes):
@@ -491,48 +545,61 @@ def page_home():
     </style>
     """, unsafe_allow_html=True)
 
+    # ホームカード用CSS（タイトルクリックで遷移するボタン風カード）
+    st.markdown("""
+    <style>
+    .home-nav-btn > button {
+        width: 100% !important; height: auto !important; min-height: 140px !important;
+        border-radius: 10px !important; border: none !important;
+        color: white !important; font-size: 0.85rem !important;
+        text-align: left !important; padding: 1.4rem 1.5rem !important;
+        line-height: 1.6 !important; white-space: pre-wrap !important;
+        cursor: pointer !important; transition: opacity 0.15s, transform 0.15s !important;
+    }
+    .home-nav-btn > button:hover { opacity: 0.88 !important; transform: translateY(-2px) !important; }
+    .home-nav-ds > button  { background: #1e3a8a !important; }
+    .home-nav-ai > button  { background: #0f766e !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
     col1, col2 = st.columns(2)
     col3, col4 = st.columns(2)
 
     with col1:
-        st.markdown('<div style="background:#1e3a8a;border-radius:10px;padding:1.5rem;color:white;cursor:pointer;margin-bottom:1rem;position:relative;">' +
-            '<span style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.2);border-radius:4px;padding:0.15rem 0.55rem;font-size:0.65rem;font-weight:700;">DIAL SHIFT</span>' +
-            '<div style="font-size:0.7rem;font-weight:700;opacity:0.7;text-transform:uppercase;margin-bottom:0.4rem;">01</div>' +
-            '<div style="font-size:1rem;font-weight:700;margin-bottom:0.4rem;">リスト成形</div>' +
-            '<div style="font-size:0.8rem;opacity:0.85;line-height:1.6;">Excelをアップロードして顧客名・電話番号・住所を整形。電話番号バリデーション付き。</div>' +
-            '</div>', unsafe_allow_html=True)
-        if st.button("このページへ移動", key="home_ds_list", use_container_width=True):
+        st.markdown('<div class="home-nav-btn home-nav-ds">', unsafe_allow_html=True)
+        if st.button(
+            "DIAL SHIFT  ·  01\n\nリスト成形\n\nExcelをアップロードして顧客名・電話番号・住所を整形。電話番号バリデーション付き。",
+            key="home_ds_list", use_container_width=True
+        ):
             st.session_state.page = 'ds_list'; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
-        st.markdown('<div style="background:#1e3a8a;border-radius:10px;padding:1.5rem;color:white;cursor:pointer;margin-bottom:1rem;position:relative;">' +
-            '<span style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.2);border-radius:4px;padding:0.15rem 0.55rem;font-size:0.65rem;font-weight:700;">DIAL SHIFT</span>' +
-            '<div style="font-size:0.7rem;font-weight:700;opacity:0.7;text-transform:uppercase;margin-bottom:0.4rem;">02</div>' +
-            '<div style="font-size:1rem;font-weight:700;margin-bottom:0.4rem;">ファイルメーカー返送</div>' +
-            '<div style="font-size:0.8rem;opacity:0.85;line-height:1.6;">ダイヤルシフトの履歴CSVをアップロードしてコール結果変換・有効無効判定を付与。</div>' +
-            '</div>', unsafe_allow_html=True)
-        if st.button("このページへ移動", key="home_ds_fm", use_container_width=True):
+        st.markdown('<div class="home-nav-btn home-nav-ds">', unsafe_allow_html=True)
+        if st.button(
+            "DIAL SHIFT  ·  02\n\nファイルメーカー返送\n\nダイヤルシフトの履歴CSVをアップロードしてコール結果変換・列名整形してCSV出力。",
+            key="home_ds_fm", use_container_width=True
+        ):
             st.session_state.page = 'ds_fm'; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col3:
-        st.markdown('<div style="background:#0369a1;border-radius:10px;padding:1.5rem;color:white;cursor:pointer;margin-bottom:1rem;position:relative;">' +
-            '<span style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.2);border-radius:4px;padding:0.15rem 0.55rem;font-size:0.65rem;font-weight:700;">AI TELEAPO</span>' +
-            '<div style="font-size:0.7rem;font-weight:700;opacity:0.7;text-transform:uppercase;margin-bottom:0.4rem;">03</div>' +
-            '<div style="font-size:1rem;font-weight:700;margin-bottom:0.4rem;">リスト成形</div>' +
-            '<div style="font-size:0.8rem;opacity:0.85;line-height:1.6;">FileMakerデータをAIテレアポ投入用CSVに変換。社名・電話番号・住所統合・IDを整形。</div>' +
-            '</div>', unsafe_allow_html=True)
-        if st.button("このページへ移動", key="home_ai_list", use_container_width=True):
+        st.markdown('<div class="home-nav-btn home-nav-ai">', unsafe_allow_html=True)
+        if st.button(
+            "AI TELEAPO  ·  03\n\nリスト成形\n\nFileMakerデータをAIテレアポ投入用CSVに変換。社名・電話番号・住所統合・IDを整形。",
+            key="home_ai_list", use_container_width=True
+        ):
             st.session_state.page = 'ai_list'; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col4:
-        st.markdown('<div style="background:#475569;border-radius:10px;padding:1.5rem;color:white;margin-bottom:1rem;position:relative;">' +
-            '<span style="position:absolute;top:1rem;right:1rem;background:rgba(255,255,255,0.2);border-radius:4px;padding:0.15rem 0.55rem;font-size:0.65rem;font-weight:700;">COMING SOON</span>' +
-            '<div style="font-size:0.7rem;font-weight:700;opacity:0.7;text-transform:uppercase;margin-bottom:0.4rem;">04</div>' +
-            '<div style="font-size:1rem;font-weight:700;margin-bottom:0.4rem;">ファイルメーカー返送</div>' +
-            '<div style="font-size:0.8rem;opacity:0.85;line-height:1.6;">現在開発中です。</div>' +
-            '</div>', unsafe_allow_html=True)
-        if st.button("工事中", key="home_ai_fm", use_container_width=True, disabled=True):
-            pass
+        st.markdown('<div class="home-nav-btn home-nav-ai">', unsafe_allow_html=True)
+        if st.button(
+            "AI TELEAPO  ·  04\n\nファイルメーカー返送\n\nAIテレアポの通話履歴CSVをアップロードして重複排除・列整形しExcel出力。",
+            key="home_ai_fm", use_container_width=True
+        ):
+            st.session_state.page = 'ai_fm'; st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ============================================================
@@ -779,24 +846,102 @@ def page_ai_list():
 
 
 # ============================================================
-# ページ: AI FM返送（工事中）
+# ページ: AI FM返送
 # ============================================================
 def page_ai_fm():
     st.markdown("""
     <div class="topbar-ai">
         <h2>AIテレアポ — ファイルメーカー返送</h2>
-        <p>現在開発中です</p>
+        <p>AIテレアポの通話履歴CSVをアップロードして重複排除・列整形しExcel出力</p>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("""
-    <div class="wip-block">
-        <h2>工事中</h2>
-        <p>
+    col_main, col_side = st.columns([3, 1])
 
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    with col_main:
+        st.markdown('<div class="card"><div class="card-label"><span class="sn-ai">1</span>AIテレアポ 通話履歴CSVをアップロード</div>', unsafe_allow_html=True)
+        uploaded = st.file_uploader("AIテレアポからエクスポートした通話履歴CSVを選択",
+                                    type=['csv'], key="ai_fm_upload", label_visibility="collapsed")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        if uploaded:
+            raw = uploaded.read()
+            st.markdown(f'<div class="alert-ok">読み込み完了 — {uploaded.name} ({len(raw)//1024:,} KB)</div>', unsafe_allow_html=True)
+
+            st.markdown('<div class="card"><div class="card-label"><span class="sn-ai">2</span>変換を実行</div>', unsafe_allow_html=True)
+            if st.button("変換を実行", type="primary", key="ai_fm_run"):
+                with st.spinner("処理中..."):
+                    try:
+                        excel_bytes, result_df, rows_before, rows_after, used_enc = process_ai_fm(raw, uploaded.name)
+
+                        removed = rows_before - rows_after
+                        st.markdown(
+                            f'<div class="alert-ok">変換完了 — 入力: {rows_before:,} 件 / 出力: {rows_after:,} 件'
+                            f' / 重複削除: {removed:,} 件 &nbsp;|&nbsp; 文字コード: {used_enc}</div>',
+                            unsafe_allow_html=True
+                        )
+
+                        job_id = add_job("AI FM返送", uploaded.name, rows_before, rows_after)
+                        st.markdown(f'<div class="alert-info">ジョブID: <code>{job_id}</code></div>', unsafe_allow_html=True)
+
+                        if "ステータス" in result_df.columns:
+                            with st.expander("ステータス分布"):
+                                dist = result_df["ステータス"].value_counts().reset_index()
+                                dist.columns = ["ステータス", "件数"]
+                                st.dataframe(dist, use_container_width=True, hide_index=True)
+
+                        with st.expander("出力データプレビュー（先頭5件）"):
+                            st.dataframe(result_df.head(5), use_container_width=True)
+
+                        base = uploaded.name.rsplit('.', 1)[0]
+                        date_str = datetime.datetime.now().strftime("%Y%m%d")
+                        st.markdown("---")
+                        st.download_button(
+                            "Excelをダウンロード", data=excel_bytes,
+                            file_name=f"{base}_{date_str}_FM返送.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key="ai_fm_dl"
+                        )
+                    except Exception as e:
+                        st.error(f"処理エラー: {e}")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    with col_side:
+        st.markdown("""
+        <div class="card">
+            <div class="card-label">処理内容</div>
+            <table class="stat-table">
+                <tr><td>IDの頭にID で重複排除（最新コールのみ残す）</td></tr>
+                <tr><td>ソース列にアップロードファイル名を付与</td></tr>
+                <tr><td>出力列を18列に固定</td></tr>
+                <tr><td>1シートのExcel（.xlsx）で出力</td></tr>
+            </table>
+        </div>
+        <div class="card" style="margin-top:0.5rem;">
+            <div class="card-label">出力列（18列）</div>
+            <table class="stat-table">
+                <tr><th>#</th><th>列名</th></tr>
+                <tr><td>1</td><td>日時</td></tr>
+                <tr><td>2</td><td>種別</td></tr>
+                <tr><td>3</td><td>会社名</td></tr>
+                <tr><td>4</td><td>担当者名</td></tr>
+                <tr><td>5</td><td>電話番号</td></tr>
+                <tr><td>6</td><td>ステータス</td></tr>
+                <tr><td>7</td><td>最終ステータス</td></tr>
+                <tr><td>8</td><td>ラベル</td></tr>
+                <tr><td>9</td><td>通話時間</td></tr>
+                <tr><td>10</td><td>架電結果</td></tr>
+                <tr><td>11</td><td>要約</td></tr>
+                <tr><td>12</td><td>詳細リンク</td></tr>
+                <tr><td>13</td><td>再電話回数</td></tr>
+                <tr><td>14</td><td>メールアドレス</td></tr>
+                <tr><td>15</td><td>最終試行</td></tr>
+                <tr><td>16</td><td>総試行回数</td></tr>
+                <tr><td>17</td><td>ソース</td></tr>
+                <tr><td>18</td><td>IDの頭にID</td></tr>
+            </table>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # ============================================================
@@ -830,7 +975,7 @@ def page_history():
         return
 
     # フィルター
-    filter_type = st.selectbox("種別フィルター", ["すべて", "DS リスト成形", "DS FM返送", "AI リスト成形"],
+    filter_type = st.selectbox("種別フィルター", ["すべて", "DS リスト成形", "DS FM返送", "AI リスト成形", "AI FM返送"],
                                 key="hist_filter", label_visibility="collapsed")
 
     filtered = jobs if filter_type == "すべて" else [j for j in jobs if j.get('type') == filter_type]
